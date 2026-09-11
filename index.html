@@ -1514,20 +1514,20 @@
 
   /* ---------------- BUILD, SHARE & GALLERY ---------------- */
   // Works two ways: inside Claude, window.storage is used automatically.
-  // Deployed on Netlify, it talks to /.netlify/functions/box (backed by Netlify Blobs)
+  // Deployed on Cloudflare Pages, it talks to /box (a Pages Function backed by Workers KV)
   // so links genuinely work for anyone who opens them.
   var useClaudeStorage = typeof window.storage !== 'undefined';
   var boxStorage = {
     get: function(key){
       if(useClaudeStorage) return window.storage.get(key, true);
-      return fetch('/.netlify/functions/box?key=' + encodeURIComponent(key)).then(function(r){
+      return fetch('/box?key=' + encodeURIComponent(key)).then(function(r){
         if(!r.ok) return null;
         return r.text().then(function(t){ return { value: t }; });
       });
     },
     set: function(key, value){
       if(useClaudeStorage) return window.storage.set(key, value, true);
-      return fetch('/.netlify/functions/box', {
+      return fetch('/box', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ key:key, value:value })
       }).then(function(r){ if(!r.ok) throw new Error('save failed'); return r; });

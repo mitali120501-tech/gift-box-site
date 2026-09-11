@@ -2,8 +2,5 @@
   "name": "gift-box",
   "version": "1.0.0",
   "private": true,
-  "description": "A digital gift box — letters, bouquet, mixtape, voice notes, album, and pixel stickers.",
-  "dependencies": {
-    "@netlify/blobs": "^7.0.0"
-  }
+  "description": "A digital gift box — letters, bouquet, mixtape, voice notes, album, and pixel stickers."
 }
