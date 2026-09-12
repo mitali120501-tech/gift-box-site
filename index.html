@@ -3506,7 +3506,15 @@
             // every remote track. The meters are not worth losing playback over.
             var audio = document.createElement('audio');
             audio.preload = 'metadata';
-            audio.src = t.url;
+            // blob: URLs only live as long as the tab that made them. Boxes built
+            // before recordings were stored as data URLs still carry them, and
+            // fetching one is guaranteed to fail — so say so instead of trying.
+            if(String(t.url).slice(0, 5) === 'blob:'){
+              row.classList.add('unplayable');
+              row.title = 'this recording did not survive being saved';
+            } else {
+              audio.src = t.url;
+            }
             audio.style.display = 'none';
             row.appendChild(audio);
             rec.media = { type:'audio', el: audio };
@@ -3562,7 +3570,12 @@
             '</div></div>' +
             '<span class="vn-label">' + escapeHtml(n.label || 'Voice note') + '</span>';
           var audio = document.createElement('audio');
-          audio.src = n.url;
+          if(String(n.url).slice(0, 5) === 'blob:'){
+            card.classList.add('unplayable');
+            card.title = 'this recording did not survive being saved';
+          } else {
+            audio.src = n.url;
+          }
           audio.style.display = 'none';
           card.appendChild(audio);
 
