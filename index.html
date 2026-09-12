@@ -3090,19 +3090,22 @@
           });
           setSpinning(playing);
         }
-        function stopTrack(rec){
+        function stopTrack(rec, unload){
           rec.row.classList.remove('now-playing');
           if(rec.media.type === 'audio'){ rec.media.el.pause(); }
           else { try{ rec.media.player && rec.media.player.pauseVideo(); }catch(e){} updateSpin(); }
-          if(active === rec) active = null;
+          if(unload && active === rec) active = null;
         }
         function playTrack(rec){
           if(ejected) return;
-          if(active && active !== rec) stopTrack(active);
+          if(active && active !== rec) stopTrack(active, true);
           active = rec;
           transport.setLabel(rec.title);
           rec.row.classList.add('now-playing');
-          if(rec.media.type === 'audio'){ rec.media.el.play(); }
+          if(rec.media.type === 'audio'){
+            var pr = rec.media.el.play();
+            if(pr && pr.catch) pr.catch(function(){});   // interrupted by a newer press
+          }
           else {
             if(!rec.media.player){ rec.row.classList.add('unplayable'); return; }
             try{ rec.media.player.playVideo(); }catch(e){}
@@ -3112,7 +3115,10 @@
         function toggleTrack(rec){
           if(ejected) return;
           if(active === rec){
-            if(rec.media.type === 'audio'){ if(rec.media.el.paused) rec.media.el.play(); else rec.media.el.pause(); }
+            if(rec.media.type === 'audio'){
+              if(rec.media.el.paused){ var p2 = rec.media.el.play(); if(p2 && p2.catch) p2.catch(function(){}); }
+              else rec.media.el.pause();
+            }
             else if(ytPlaying(rec)){ stopTrack(rec); }
             else { playTrack(rec); }
           } else {
@@ -3133,11 +3139,17 @@
           if(ejected || !tracks.length) return;
           var idx = tracks.indexOf(fromRec || active);
           if(idx < 0) idx = lastStarted;
-          var next = idx + dir;
-          if(next < 0 || next >= tracks.length){
-            if(onlyIfMore) return;
-            next = (next + tracks.length) % tracks.length;
-          }
+          // step over anything already known to be unplayable, rather than
+          // landing on a dead track and appearing to have stopped
+          var next = idx, guard = 0;
+          do {
+            next += dir;
+            if(next < 0 || next >= tracks.length){
+              if(onlyIfMore) return;
+              next = (next + tracks.length) % tracks.length;
+            }
+            if(++guard > tracks.length) return;
+          } while(tracks[next].row.classList.contains('unplayable'));
           lastStarted = next;
           playTrack(tracks[next]);
         }
@@ -3163,7 +3175,7 @@
           transport.setEjected(v);
           playBtn.disabled = v; rewBtn.disabled = v; ffBtn.disabled = v;
           prevBtn.disabled = v; nextBtn.disabled = v;
-          if(v && active) stopTrack(active);
+          if(v && active) stopTrack(active, true);
         }
         ejectBtn.addEventListener('click', function(){ setEjected(!ejected); });
         tapeCanvas.addEventListener('click', function(){
@@ -3491,7 +3503,6 @@
                       row.classList.add('now-playing');
                     } else {
                       row.classList.remove('now-playing');
-                      if(active === rec && ev.data !== S.BUFFERING) active = null;
                       if(ev.data === S.ENDED) playAdjacent(rec, 1, true);
                     }
                     updateSpin();
@@ -3519,10 +3530,9 @@
             row.appendChild(audio);
             rec.media = { type:'audio', el: audio };
             audio.addEventListener('play', function(){ soloTrack(rec); active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); showTime(rec); });
-            audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); });
+            audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); updateSpin(); });
             audio.addEventListener('ended', function(){
               row.classList.remove('now-playing');
-              if(active === rec){ active = null; }
               updateSpin(); setTapeProgress(0);
               playAdjacent(rec, 1, true);          // a side plays through to the end
             });
