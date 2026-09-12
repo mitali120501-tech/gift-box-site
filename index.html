@@ -2004,11 +2004,10 @@
 
   // auto-load a shared box from the URL hash, e.g. #box=b12345 — reveal it through the
   // same ribbon/lid ceremony as any other box, instead of skipping straight to the carousel.
-  // With no hash at all, the home page defaults to this box so the plain root link works too.
-  var DEFAULT_BOX_ID = 'b178919471187274';
+  // No hash means the plain root URL — just the ordinary ribbon/build screen.
   (function(){
     var m = location.hash.match(/box=([a-zA-Z0-9]+)/);
-    loadBoxById(m ? m[1] : DEFAULT_BOX_ID, true);
+    if(m){ loadBoxById(m[1], true); }
   })();
 
   refreshGallery();
