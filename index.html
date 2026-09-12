@@ -291,8 +291,14 @@
 
   /* ---------- STICKERS / DECORATE ---------- */
   .sticker-palette{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-bottom:16px; }
-  .sticker-choice{ background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:8px; padding:8px; cursor:pointer; }
+  .sticker-choice{ position:relative; background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:8px; padding:8px; cursor:pointer; }
   .sticker-choice:hover{ background:#fff; }
+  .sticker-dl{
+    position:absolute; right:-5px; top:-5px; width:18px; height:18px; padding:0; line-height:16px;
+    border-radius:50%; border:1px solid var(--paper); background:var(--maroon); color:#f2dcb8;
+    font-size:10px; cursor:pointer; opacity:0; transition:opacity .15s; z-index:2;
+  }
+  .sticker-choice:hover .sticker-dl, .sticker-dl:focus{ opacity:1; }
   #decorateCanvas{
     position:relative; width:100%; height:320px; background: var(--kraft);
     border-radius:8px; overflow:hidden; border:2px dashed var(--kraft-dark);
@@ -490,6 +496,7 @@
   .viewer-cassette-mixtape .track-row:hover{ background:var(--paper-dark); }
   .viewer-cassette-mixtape .track-row.now-playing .title{ color:var(--maroon); font-weight:600; }
   .viewer-cassette-mixtape .track-row.now-playing .title::before{ content:'▶ '; }
+  .viewer-cassette-mixtape .track-row.unplayable .title{ opacity:.45; text-decoration:line-through; }
   .viewer-cassette-mixtape .track-row .title{ font-size:14px; }
   /* ---- fully-simulated cassette deck ---- */
   .tape-deck{ width:300px; margin:0 auto 14px; background:linear-gradient(180deg,#4a423a,#2e2822); border-radius:12px; padding:14px; box-shadow:0 10px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); }
@@ -499,8 +506,8 @@
   .tape-counter{ background:#111; border-radius:4px; padding:4px 8px; font-family:'Press Start 2P', monospace; font-size:12px; color:#e8d9a8; letter-spacing:2px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
   .vu-meters{ display:flex; gap:4px; align-items:flex-end; height:22px; background:#111; border-radius:4px; padding:3px 5px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
   .vu-bar{ width:6px; height:4%; border-radius:1px; background:linear-gradient(0deg,#6B8F71,#D9A441 70%,#B23A48 92%); transition:height .08s linear; }
-  .deck-controls{ display:flex; justify-content:center; gap:10px; margin-top:12px; }
-  .deck-btn{ width:44px; height:34px; border-radius:5px; border:none; background:linear-gradient(180deg,#5a5049,#332c26); color:#e8d9a8; font-size:15px; box-shadow:0 3px 0 #1c1713, 0 4px 6px rgba(0,0,0,.4); cursor:pointer; transition:transform .1s, box-shadow .1s; }
+  .deck-controls{ display:flex; justify-content:center; gap:6px; margin-top:12px; flex-wrap:wrap; }
+  .deck-btn{ width:38px; height:32px; border-radius:5px; border:none; background:linear-gradient(180deg,#5a5049,#332c26); color:#e8d9a8; font-size:15px; box-shadow:0 3px 0 #1c1713, 0 4px 6px rgba(0,0,0,.4); cursor:pointer; transition:transform .1s, box-shadow .1s; }
   .deck-btn:active, .deck-btn.pressed{ transform:translateY(3px); box-shadow:0 0 0 #1c1713, 0 1px 2px rgba(0,0,0,.4); }
   .deck-btn.play-btn.playing{ color:#D9A441; }
   .deck-btn:disabled{ opacity:.4; cursor:default; }
@@ -2058,15 +2065,55 @@
   var palette = document.getElementById('stickerPalette');
   var canvas = document.getElementById('decorateCanvas');
 
-  Object.keys(STICKERS).forEach(function(key){
+  // Save a sticker as a real PNG. The pixel art is re-rendered at a big cell size
+  // first, so what you get is a crisp sheet-ready image rather than a 44px thumbnail.
+  function downloadSticker(key){
+    var s = STICKERS[key];
+    var rows = s.grid.length, cols = s.grid[0].length, cell = 28;
+    var W = cols * cell, H = rows * cell, rects = '';
+    for(var r = 0; r < rows; r++){
+      for(var c = 0; c < cols; c++){
+        var ch = s.grid[r][c];
+        if(ch === '.' || !s.colors[ch]) continue;
+        rects += '<rect x="' + (c*cell) + '" y="' + (r*cell) + '" width="' + cell + '" height="' + cell + '" fill="' + s.colors[ch] + '"/>';
+      }
+    }
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
+    var img = new Image();
+    img.onload = function(){
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      cv.getContext('2d').drawImage(img, 0, 0);
+      cv.toBlob(function(blob){
+        if(!blob) return;
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'sticker-' + key + '.png';
+        document.body.appendChild(a); a.click();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      });
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  function makePaletteTile(key){
     var s = STICKERS[key];
     var choice = document.createElement('div');
     choice.className = 'sticker-choice';
     choice.innerHTML = px(s.grid, s.colors);
-    choice.title = 'add ' + key;
+    choice.title = 'tap to stick it on the board';
     choice.addEventListener('click', function(){ placeSticker(key); });
+    var dl = document.createElement('button');
+    dl.className = 'sticker-dl';
+    dl.type = 'button';
+    dl.textContent = '⬇';
+    dl.title = 'save this sticker as a PNG';
+    dl.addEventListener('click', function(e){ e.stopPropagation(); downloadSticker(key); });
+    choice.appendChild(dl);
     palette.appendChild(choice);
-  });
+  }
+
+  Object.keys(STICKERS).forEach(makePaletteTile);
 
   function placeSticker(key, targetCanvas){
     targetCanvas = targetCanvas || canvas;
@@ -2175,15 +2222,7 @@
     addStickerToPalette(key);
   });
 
-  function addStickerToPalette(key){
-    var s = STICKERS[key];
-    var choice = document.createElement('div');
-    choice.className = 'sticker-choice';
-    choice.innerHTML = px(s.grid, s.colors, 8);
-    choice.title = 'add ' + key;
-    choice.addEventListener('click', function(){ placeSticker(key); });
-    palette.appendChild(choice);
-  }
+  function addStickerToPalette(key){ makePaletteTile(key); }
 
   /* ---------------- DOODLE (jsPaint-style) ---------------- */
   var doodleCanvas = document.getElementById('doodleCanvas');
@@ -2564,13 +2603,15 @@
                 '<div class="vu-meters"><div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div></div>' +
               '</div>' +
               '<div class="deck-controls">' +
-                '<button class="deck-btn" data-action="rew" title="rewind">⏪</button>' +
-                '<button class="deck-btn play-btn" data-action="play" title="play/pause">▶</button>' +
-                '<button class="deck-btn" data-action="ff" title="fast-forward">⏩</button>' +
+                '<button class="deck-btn" data-action="prev" title="previous track">⏮</button>' +
+                '<button class="deck-btn" data-action="rew" title="hold to rewind">⏪</button>' +
+                '<button class="deck-btn play-btn" data-action="play" title="play / pause">▶</button>' +
+                '<button class="deck-btn" data-action="ff" title="hold to fast-forward">⏩</button>' +
+                '<button class="deck-btn" data-action="next" title="next track">⏭</button>' +
                 '<button class="deck-btn" data-action="eject" title="eject">⏏</button>' +
               '</div>' +
             '</div>' +
-            '<p class="tape-hint note">press ▶ to play, hold ⏪/⏩ to scrub, ⏏ to eject the tape</p>' +
+            '<p class="tape-hint note">⏮⏭ skip tracks · hold ⏪⏩ to wind the tape · ⏏ ejects it</p>' +
           '</div>' +
           '<div class="viewer-vinyl-view" style="display:none;">' +
             '<div class="turntable-3d"></div>' +
@@ -2584,6 +2625,8 @@
         var playBtn = wrap.querySelector('.deck-btn[data-action="play"]');
         var rewBtn = wrap.querySelector('.deck-btn[data-action="rew"]');
         var ffBtn = wrap.querySelector('.deck-btn[data-action="ff"]');
+        var prevBtn = wrap.querySelector('.deck-btn[data-action="prev"]');
+        var nextBtn = wrap.querySelector('.deck-btn[data-action="next"]');
         var ejectBtn = wrap.querySelector('.deck-btn[data-action="eject"]');
         var cassetteView = wrap.querySelector('.viewer-cassette-view');
         var vinylView = wrap.querySelector('.viewer-vinyl-view');
@@ -2847,23 +2890,36 @@
           turntable.setProgress(p);
         }
         function formatCounter(t){
-          if(!isFinite(t)) t = 0;
+          if(!isFinite(t) || t < 0) t = 0;
           var m = Math.floor(t / 60), s = Math.floor(t % 60);
           return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+        function showTime(rec){
+          if(!rec || rec.media.type !== 'audio'){ tapeCounterEl.textContent = '--:--'; return; }
+          var el = rec.media.el;
+          var total = isFinite(el.duration) && el.duration ? ' / ' + formatCounter(el.duration) : '';
+          tapeCounterEl.textContent = formatCounter(el.currentTime) + total;
         }
 
         var tracks = [];
         var active = null;
         var ejected = false;
 
-        /* ---- best-effort real audio analysis for the VU meters (falls back to a
-           resting level for cross-origin sources without CORS, or youtube tracks) ---- */
-        var audioCtx = null;
+        /* ---- VU meters ----
+           Routing a media element through Web Audio permanently rewires its output,
+           and for a cross-origin file without CORS headers that output is silenced —
+           so real metering is only safe for sources we know are same-origin (the
+           voice notes, which are data: URLs). Everywhere else the needles are a
+           stylised level driven by playback, never worth risking the audio for.   */
+        var audioCtx = null, vuData = new Uint8Array(32), vuLevel = 0;
         function getAnalyser(rec){
-          if(rec.media.type !== 'audio') return null;
           if(rec._analyser !== undefined) return rec._analyser;
+          rec._analyser = null;
+          if(rec.media.type !== 'audio') return null;
+          if(String(rec.media.el.src).slice(0, 5) !== 'data:') return null;
           try{
             if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if(audioCtx.state === 'suspended') audioCtx.resume();
             var src = audioCtx.createMediaElementSource(rec.media.el);
             var an = audioCtx.createAnalyser();
             an.fftSize = 64;
@@ -2873,21 +2929,24 @@
           } catch(e){ rec._analyser = null; }
           return rec._analyser;
         }
-        var vuData = new Uint8Array(32);
         function vuTick(){
-          var an = active ? getAnalyser(active) : null;
-          if(an && active && active.media.type === 'audio' && !active.media.el.paused){
-            an.getByteFrequencyData(vuData);
-            var avg = 0;
-            for(var i = 0; i < vuData.length; i++) avg += vuData[i];
-            avg /= vuData.length;
-            vuBars.forEach(function(bar, bi){
-              var lvl = Math.min(100, Math.max(4, (avg / 255) * 100 * (0.85 + bi * 0.1) + Math.random() * 10));
-              bar.style.height = lvl + '%';
-            });
-          } else {
-            vuBars.forEach(function(bar){ bar.style.height = '4%'; });
+          var playing = active && active.media.type === 'audio' && !active.media.el.paused;
+          var target = 0.04;
+          if(playing){
+            var an = getAnalyser(active);
+            if(an){
+              an.getByteFrequencyData(vuData);
+              var avg = 0;
+              for(var i = 0; i < vuData.length; i++) avg += vuData[i];
+              target = Math.min(1, (avg / vuData.length / 255) * 1.7);
+            } else {
+              target = 0.34 + Math.abs(Math.sin(performance.now() / 190)) * 0.36 + Math.random() * 0.12;
+            }
           }
+          vuLevel += (target - vuLevel) * 0.35;
+          vuBars.forEach(function(bar, bi){
+            bar.style.height = Math.max(4, Math.min(100, vuLevel * 100 * (0.82 + bi * 0.12))) + '%';
+          });
           requestAnimationFrame(vuTick);
         }
         requestAnimationFrame(vuTick);
@@ -2934,12 +2993,40 @@
         }
         playBtn.addEventListener('click', toggleActiveOrFirst);
 
+        // step to the neighbouring track. `onlyIfMore` is for reaching the end of a
+        // track naturally: run on to the next one, but stop at the end of the side.
+        var lastStarted = 0;
+        function playAdjacent(fromRec, dir, onlyIfMore){
+          if(ejected || !tracks.length) return;
+          var idx = tracks.indexOf(fromRec || active);
+          if(idx < 0) idx = lastStarted;
+          var next = idx + dir;
+          if(next < 0 || next >= tracks.length){
+            if(onlyIfMore) return;
+            next = (next + tracks.length) % tracks.length;
+          }
+          lastStarted = next;
+          playTrack(tracks[next]);
+        }
+        prevBtn.addEventListener('click', function(){
+          if(ejected) return;
+          // like a real deck: part-way into a track, skip back returns to its start
+          if(active && active.media.type === 'audio' && active.media.el.currentTime > 3){
+            active.media.el.currentTime = 0;
+            showTime(active);
+            return;
+          }
+          playAdjacent(active, -1);
+        });
+        nextBtn.addEventListener('click', function(){ if(!ejected) playAdjacent(active, 1); });
+
         function isPlayingRec(rec){ return rec.media.type === 'audio' ? !rec.media.el.paused : !!rec.ytPlaying; }
 
         function setEjected(v){
           ejected = v;
           transport.setEjected(v);
           playBtn.disabled = v; rewBtn.disabled = v; ffBtn.disabled = v;
+          prevBtn.disabled = v; nextBtn.disabled = v;
           if(v && active) stopTrack(active);
         }
         ejectBtn.addEventListener('click', function(){ setEjected(!ejected); });
@@ -3247,18 +3334,31 @@
             row.appendChild(iframe);
             rec.media = { type:'youtube', iframe: iframe };
           } else {
+            // deliberately no crossOrigin: asking for CORS makes hosts that don't
+            // send the headers refuse to load the file at all, which silently broke
+            // every remote track. The meters are not worth losing playback over.
             var audio = document.createElement('audio');
-            audio.crossOrigin = 'anonymous';
+            audio.preload = 'metadata';
             audio.src = t.url;
             audio.style.display = 'none';
             row.appendChild(audio);
             rec.media = { type:'audio', el: audio };
-            audio.addEventListener('play', function(){ active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); });
+            audio.addEventListener('play', function(){ active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); showTime(rec); });
             audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); });
-            audio.addEventListener('ended', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); setTapeProgress(0); });
+            audio.addEventListener('ended', function(){
+              row.classList.remove('now-playing');
+              if(active === rec){ active = null; }
+              updateSpin(); setTapeProgress(0);
+              playAdjacent(rec, 1, true);          // a side plays through to the end
+            });
+            audio.addEventListener('loadedmetadata', function(){ if(active === rec) showTime(rec); });
             audio.addEventListener('timeupdate', function(){
               if(audio.duration) setTapeProgress(audio.currentTime / audio.duration);
-              if(active === rec) tapeCounterEl.textContent = formatCounter(audio.currentTime);
+              if(active === rec) showTime(rec);
+            });
+            audio.addEventListener('error', function(){
+              row.classList.add('unplayable');
+              row.title = 'this track could not be loaded';
             });
           }
           row.addEventListener('click', function(){ toggleTrack(rec); });
