@@ -177,9 +177,8 @@
   .letter-card.folded .flap-bottom{ transform: rotateX(0deg); }
   .seal{
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.4); z-index:3;
-    width:46px; height:46px; border-radius:50%; background: radial-gradient(circle at 35% 30%, #9a3d3d, var(--maroon) 70%);
-    box-shadow:0 2px 5px rgba(0,0,0,.4); opacity:0; transition: opacity .4s .5s, transform .4s .5s;
-    display:flex; align-items:center; justify-content:center; color:#f2dcb8; font-family:'Fraunces',serif; font-size:18px;
+    width:46px; height:46px; opacity:0; transition: opacity .4s .5s, transform .4s .5s;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.4));
   }
   .letter-card.folded .seal{ opacity:1; transform:translate(-50%,-50%) scale(1); }
   .envelope-sticker-layer{ position:absolute; inset:0; z-index:4; opacity:0; pointer-events:none; transition:opacity .3s; }
@@ -197,7 +196,7 @@
   .color-dot{ width:20px; height:20px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--kraft-dark); cursor:pointer; }
   .color-dot.active{ box-shadow:0 0 0 2px var(--maroon); }
   .seal-picker{ display:flex; gap:6px; justify-content:center; margin-top:6px; }
-  .seal-swatch{ width:24px; height:24px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#f2dcb8; font-size:12px; border:2px solid transparent; }
+  .seal-swatch{ width:24px; height:24px; cursor:pointer; border-radius:50%; border:2px solid transparent; box-sizing:content-box; }
   .seal-swatch.active{ border-color:var(--ink); }
   .source-tag{ font-size:10px; padding:2px 6px; border-radius:8px; background:var(--kraft); color:var(--ink); margin-left:6px; }
   .unlock-row{ margin-top:6px; font-size:12px; color:#6b5f4e; }
@@ -379,8 +378,7 @@
   .viewer-letter-scene.open .viewer-envelope-cover{ clip-path: circle(0% at 50% 50%); }
   .viewer-envelope-cover .viewer-seal{
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1;
-    width:46px; height:46px; border-radius:50%; box-shadow:0 2px 5px rgba(0,0,0,.4);
-    display:flex; align-items:center; justify-content:center; color:#f2dcb8; font-family:'Fraunces',serif; font-size:18px;
+    width:46px; height:46px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4));
   }
   .viewer-tap-hint{ text-align:center; font-size:12px; color:#6b5f4e; margin-top:6px; }
   .viewer-polaroid{ display:inline-block; background:#fff; padding:10px 10px 26px; box-shadow:0 4px 10px rgba(0,0,0,.2); margin:10px; border-radius:2px; }
@@ -763,6 +761,53 @@
   ];
   var PEN_COLORS = ['#2B2420','#7A2E2E','#3a5a6b'];
 
+  /* ---------------- WAX SEAL (algorithmically drawn, not an emoji) ---------------- */
+  // A deterministic "blob" outline (seeded pseudo-random radii through a Catmull-Rom
+  // spline) so each seal looks like real dripped wax instead of a perfect circle.
+  function sealSeededRandom(seed){ var x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+  function sealBlobPath(seed){
+    var points = 11, cx = 50, cy = 52, baseR = 42, irregularity = 0.11;
+    var pts = [];
+    for(var i = 0; i < points; i++){
+      var angle = (i / points) * Math.PI * 2;
+      var r = baseR * (1 + (sealSeededRandom(seed + i * 12.9898) - 0.5) * irregularity * 2);
+      pts.push([cx + Math.cos(angle) * r, cy + Math.sin(angle) * r]);
+    }
+    var d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+    for(var j = 0; j < points; j++){
+      var p0 = pts[(j - 1 + points) % points], p1 = pts[j], p2 = pts[(j + 1) % points], p3 = pts[(j + 2) % points];
+      var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+    }
+    return d + ' Z';
+  }
+  function sealShade(hex, percent){
+    var f = parseInt(hex.slice(1), 16), t = percent < 0 ? 0 : 255, p = Math.abs(percent) / 100;
+    var R = f >> 16, G = (f >> 8) & 0x00FF, B = f & 0x0000FF;
+    return '#' + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
+  }
+  var SEAL_BLOB_CACHE = {};
+  function waxSealSVG(color, symbol, seed, fontSize){
+    if(!(seed in SEAL_BLOB_CACHE)) SEAL_BLOB_CACHE[seed] = sealBlobPath(seed);
+    var path = SEAL_BLOB_CACHE[seed];
+    var light = sealShade(color, 32), dark = sealShade(color, -38);
+    var uid = 'waxg' + seed;
+    fontSize = fontSize || 32;
+    return '<svg viewBox="0 0 100 104" width="100%" height="100%" style="overflow:visible;">' +
+      '<defs><radialGradient id="' + uid + '" cx="36%" cy="28%" r="80%">' +
+        '<stop offset="0%" stop-color="' + light + '"/>' +
+        '<stop offset="55%" stop-color="' + color + '"/>' +
+        '<stop offset="100%" stop-color="' + dark + '"/>' +
+      '</radialGradient></defs>' +
+      '<path d="' + path + '" fill="url(#' + uid + ')" stroke="' + dark + '" stroke-width="1"/>' +
+      '<ellipse cx="37" cy="29" rx="15" ry="9" fill="#fff" opacity="0.2"/>' +
+      '<text x="51" y="61" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + fontSize + '" fill="' + dark + '" opacity="0.6">' + symbol + '</text>' +
+      '<text x="49" y="59" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + fontSize + '" fill="' + light + '" opacity="0.55">' + symbol + '</text>' +
+      '<text x="50" y="60" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + (fontSize - 2) + '" fill="' + color + '">' + symbol + '</text>' +
+    '</svg>';
+  }
+
   function addLetter(prefill){
     letterCount++;
     var id = 'letter' + letterCount;
@@ -781,14 +826,14 @@
       '<canvas class="letter-canvas" width="300" height="270"></canvas>' +
       '<div class="flap flap-top"></div>' +
       '<div class="flap flap-bottom"></div>' +
-      '<div class="seal" style="background:' + SEALS[0].color + '">' + SEALS[0].sym + '</div>' +
+      '<div class="seal">' + waxSealSVG(SEALS[0].color, SEALS[0].sym, 0) + '</div>' +
       '<div class="envelope-sticker-layer"></div>';
     container.appendChild(card);
 
     var btn = document.createElement('div');
     btn.className = 'letter-controls';
     var sealSwatches = SEALS.map(function(s,i){
-      return '<div class="seal-swatch' + (i===0?' active':'') + '" data-i="'+i+'" style="background:'+s.color+'">'+s.sym+'</div>';
+      return '<div class="seal-swatch' + (i===0?' active':'') + '" data-i="'+i+'">' + waxSealSVG(s.color, s.sym, i, 22) + '</div>';
     }).join('');
     btn.innerHTML = '<button class="small ghost fold-btn">Fold &amp; seal ✉️</button><div class="seal-picker">'+sealSwatches+'</div>' +
       '<div class="unlock-row">🔒 seal until <input type="date" class="unlock-date"></div>' +
@@ -840,11 +885,11 @@
       sw.addEventListener('click', function(){
         btn.querySelectorAll('.seal-swatch').forEach(function(s){ s.classList.remove('active'); });
         sw.classList.add('active');
-        var s = SEALS[+sw.dataset.i];
+        var i = +sw.dataset.i;
+        var s = SEALS[i];
         var sealEl = card.querySelector('.seal');
-        sealEl.style.background = s.color;
-        sealEl.textContent = s.sym;
-        rec.sealIndex = +sw.dataset.i;
+        sealEl.innerHTML = waxSealSVG(s.color, s.sym, i);
+        rec.sealIndex = i;
       });
     });
 
@@ -1819,13 +1864,14 @@
     (state.letters || []).forEach(function(l, i){
       if(!l.text && !l.handwriting) return;
       slides.push({ label: (state.letters.length > 1 ? 'Letter ' + (i+1) : 'Letter'), render: function(container){
-        var seal = SEALS[l.sealIndex || 0] || SEALS[0];
+        var sealIndex = l.sealIndex || 0;
+        var seal = SEALS[sealIndex] || SEALS[0];
         var scene = document.createElement('div');
         scene.className = 'viewer-letter-scene';
         scene.innerHTML =
           '<div class="viewer-letter-paper"></div>' +
           '<div class="viewer-envelope-cover">' +
-            '<div class="viewer-seal" style="background:'+seal.color+'">'+seal.sym+'</div>' +
+            '<div class="viewer-seal">' + waxSealSVG(seal.color, seal.sym, sealIndex) + '</div>' +
             '<div class="viewer-envelope-stickers"></div>' +
           '</div>';
         container.appendChild(scene);
