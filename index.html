@@ -1337,10 +1337,13 @@
     }catch(e){}
   }
   function playSealStamp(){
-    var overlay = document.getElementById('stampOverlay');
-    overlay.classList.add('show');
-    playThud();
-    setTimeout(function(){ overlay.classList.remove('show'); }, 900);
+    try{
+      var overlay = document.getElementById('stampOverlay');
+      if(!overlay) return;
+      overlay.classList.add('show');
+      playThud();
+      setTimeout(function(){ overlay.classList.remove('show'); }, 900);
+    }catch(e){}
   }
 
   /* ---------------- POSTMARK ---------------- */
