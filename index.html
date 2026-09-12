@@ -451,6 +451,7 @@
     </div>
     <div class="step-caption" id="stepCaption">Step 1 — untie the ribbon</div>
     <button id="stepBtn">Untie the ribbon</button>
+    <div style="margin-top:14px;"><a href="#" id="homeGalleryLink" class="hand" style="font-size:1.15rem;">🔗 see all the boxes people have built →</a></div>
   </div>
 
   <div class="stamp-overlay" id="stampOverlay"><div class="big-seal" id="bigSeal">✦</div></div>
@@ -717,6 +718,15 @@
         }
       }, 500);
     }
+  });
+
+  document.getElementById('homeGalleryLink').addEventListener('click', function(e){
+    e.preventDefault();
+    boxOuter.classList.add('untied', 'lid-open');
+    boxScreen.style.display = 'none';
+    app.classList.add('show');
+    var galleryBtn = document.querySelector('nav.tabs button[data-tab="gallery"]');
+    if(galleryBtn) galleryBtn.click();
   });
 
   /* ---------------- TABS ---------------- */
