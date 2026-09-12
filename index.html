@@ -182,6 +182,12 @@
     display:flex; align-items:center; justify-content:center; color:#f2dcb8; font-family:'Fraunces',serif; font-size:18px;
   }
   .letter-card.folded .seal{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .envelope-sticker-layer{ position:absolute; inset:0; z-index:4; opacity:0; pointer-events:none; transition:opacity .3s; }
+  .letter-card.folded .envelope-sticker-layer{ opacity:1; pointer-events:auto; }
+  .envelope-sticker-layer .placed-sticker{ position:absolute; cursor:grab; touch-action:none; user-select:none; }
+  .envelope-sticker-layer .placed-sticker:active{ cursor:grabbing; }
+  .letter-sticker-picker{ margin-top:8px; }
+  .letter-sticker-picker .envelope-sticker-choices{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
   .letter-controls{ text-align:center; margin-top:8px; }
   #addLetterWrap{ text-align:center; margin-top:10px; }
   .letter-toolbar{ display:flex; gap:6px; justify-content:center; margin-bottom:6px; flex-wrap:wrap; }
@@ -392,6 +398,12 @@
   .viewer-recipe h4{ margin:0 0 6px; }
   .viewer-sticker-canvas{ position:relative; width:100%; max-width:500px; min-height:320px; margin:0 auto; background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:10px; overflow:hidden; }
   .viewer-sticker-canvas .placed-sticker{ position:absolute; pointer-events:none; }
+  .viewer-envelope-stickers{ position:absolute; inset:0; z-index:4; pointer-events:none; opacity:1; transition:opacity .3s; }
+  .viewer-letter-card.open .viewer-envelope-stickers{ opacity:0; }
+  .viewer-envelope-stickers .placed-sticker{ position:absolute; }
+  .viewer-cassette-mixtape .format-toggle{ display:flex; gap:8px; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
+  .viewer-cassette-mixtape .track-row{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:0 0 14px; }
+  .viewer-cassette-mixtape .track-row .title{ font-size:14px; }
   .viewer-nav{ display:flex; align-items:center; justify-content:center; gap:14px; margin-top:18px; }
   .viewer-dots{ display:flex; gap:6px; }
   .viewer-dot{ width:9px; height:9px; border-radius:50%; background:var(--kraft-dark); cursor:pointer; }
@@ -752,7 +764,8 @@
       '<canvas class="letter-canvas" width="300" height="270"></canvas>' +
       '<div class="flap flap-top"></div>' +
       '<div class="flap flap-bottom"></div>' +
-      '<div class="seal" style="background:' + SEALS[0].color + '">' + SEALS[0].sym + '</div>';
+      '<div class="seal" style="background:' + SEALS[0].color + '">' + SEALS[0].sym + '</div>' +
+      '<div class="envelope-sticker-layer"></div>';
     container.appendChild(card);
 
     var btn = document.createElement('div');
@@ -761,7 +774,8 @@
       return '<div class="seal-swatch' + (i===0?' active':'') + '" data-i="'+i+'" style="background:'+s.color+'">'+s.sym+'</div>';
     }).join('');
     btn.innerHTML = '<button class="small ghost fold-btn">Fold &amp; seal ✉️</button><div class="seal-picker">'+sealSwatches+'</div>' +
-      '<div class="unlock-row">🔒 seal until <input type="date" class="unlock-date"></div>';
+      '<div class="unlock-row">🔒 seal until <input type="date" class="unlock-date"></div>' +
+      '<div class="letter-sticker-picker" style="display:none;"><p class="note" style="margin:6px 0 4px;">decorate the sealed envelope:</p><div class="envelope-sticker-choices"></div></div>';
     container.appendChild(btn);
     lettersGrid.appendChild(container);
 
@@ -834,10 +848,27 @@
         foldBtn.textContent = folded ? 'Unfold ✉️' : 'Fold & seal ✉️';
       }
     }
+    var envLayer = card.querySelector('.envelope-sticker-layer');
+    var stickerPickerWrap = btn.querySelector('.letter-sticker-picker');
+    var stickerChoicesEl = btn.querySelector('.envelope-sticker-choices');
     btn.querySelector('.fold-btn').addEventListener('click', function(){
       if(card.classList.contains('folded') && isLocked()) return;
       card.classList.toggle('folded');
       updateFoldLabel();
+      var folded = card.classList.contains('folded');
+      stickerPickerWrap.style.display = folded ? 'block' : 'none';
+      if(folded && typeof STICKERS !== 'undefined'){
+        stickerChoicesEl.innerHTML = '';
+        Object.keys(STICKERS).forEach(function(key){
+          var s = STICKERS[key];
+          var choice = document.createElement('div');
+          choice.className = 'sticker-choice';
+          choice.innerHTML = px(s.grid, s.colors);
+          choice.title = 'add ' + key;
+          choice.addEventListener('click', function(){ placeSticker(key, envLayer); });
+          stickerChoicesEl.appendChild(choice);
+        });
+      }
     });
     unlockInput.addEventListener('change', updateFoldLabel);
 
@@ -1485,28 +1516,30 @@
     palette.appendChild(choice);
   });
 
-  function placeSticker(key){
+  function placeSticker(key, targetCanvas){
+    targetCanvas = targetCanvas || canvas;
     var s = STICKERS[key];
     var el = document.createElement('div');
     el.className = 'placed-sticker';
     el.innerHTML = px(s.grid, s.colors, 8);
-    var maxX = Math.max(canvas.clientWidth - 90, 10);
-    var maxY = Math.max(canvas.clientHeight - 90, 10);
+    var maxX = Math.max(targetCanvas.clientWidth - 90, 10);
+    var maxY = Math.max(targetCanvas.clientHeight - 90, 10);
     el.style.left = (20 + Math.random()*maxX*0.8) + 'px';
     el.style.top = (20 + Math.random()*maxY*0.8) + 'px';
-    canvas.appendChild(el);
-    makeDraggable(el);
+    targetCanvas.appendChild(el);
+    makeDraggable(el, targetCanvas);
   }
 
-  function makeDraggable(el){
+  function makeDraggable(el, targetCanvas){
+    targetCanvas = targetCanvas || canvas;
     el.addEventListener('pointerdown', function(e){
       e.preventDefault();
-      var rect = canvas.getBoundingClientRect();
+      var rect = targetCanvas.getBoundingClientRect();
       function onMove(ev){
         var x = ev.clientX - rect.left - el.offsetWidth/2;
         var y = ev.clientY - rect.top - el.offsetHeight/2;
-        x = Math.max(0, Math.min(canvas.clientWidth - el.offsetWidth, x));
-        y = Math.max(0, Math.min(canvas.clientHeight - el.offsetHeight, y));
+        x = Math.max(0, Math.min(targetCanvas.clientWidth - el.offsetWidth, x));
+        y = Math.max(0, Math.min(targetCanvas.clientHeight - el.offsetHeight, y));
         el.style.left = x + 'px';
         el.style.top = y + 'px';
       }
@@ -1682,7 +1715,15 @@
     return {
       created: new Date().toISOString(),
       letters: letters.map(function(l){
-        return { text: l.textarea.value, handwriting: l.card.classList.contains('handwrite') ? l.canvas.toDataURL('image/png') : null, sealIndex: l.sealIndex, unlockDate: l.unlockInput.value || null };
+        return {
+          text: l.textarea.value,
+          handwriting: l.card.classList.contains('handwrite') ? l.canvas.toDataURL('image/png') : null,
+          sealIndex: l.sealIndex,
+          unlockDate: l.unlockInput.value || null,
+          envelopeStickers: Array.from(l.card.querySelectorAll('.envelope-sticker-layer .placed-sticker')).map(function(s){
+            return { left: s.style.left, top: s.style.top, html: s.innerHTML };
+          })
+        };
       }),
       tracklist: tracklist,
       linerNotes: document.getElementById('linerNotes').value,
@@ -1768,8 +1809,17 @@
           '<div class="viewer-letter-paper"></div>' +
           '<div class="viewer-flap viewer-flap-top"></div>' +
           '<div class="viewer-flap viewer-flap-bottom"></div>' +
-          '<div class="viewer-seal" style="background:'+seal.color+'">'+seal.sym+'</div>';
+          '<div class="viewer-seal" style="background:'+seal.color+'">'+seal.sym+'</div>' +
+          '<div class="viewer-envelope-stickers"></div>';
         container.appendChild(card);
+        var stickerLayer = card.querySelector('.viewer-envelope-stickers');
+        (l.envelopeStickers || []).forEach(function(s){
+          var el = document.createElement('div');
+          el.className = 'placed-sticker';
+          el.innerHTML = s.html;
+          el.style.left = s.left; el.style.top = s.top;
+          stickerLayer.appendChild(el);
+        });
         var paper = card.querySelector('.viewer-letter-paper');
         if(l.handwriting){
           var img = document.createElement('img');
@@ -1801,6 +1851,38 @@
 
     if((state.tracklist || []).length || (state.linerNotes || '').trim()){
       slides.push({ label: 'Mixtape', render: function(container){
+        var wrap = document.createElement('div');
+        wrap.className = 'viewer-cassette-mixtape';
+        wrap.innerHTML =
+          '<div class="format-toggle">' +
+            '<button class="small viewer-fmt-btn" data-fmt="cassette">📼 Cassette</button>' +
+            '<button class="small ghost viewer-fmt-btn" data-fmt="vinyl">💿 Vinyl</button>' +
+          '</div>' +
+          '<div class="viewer-cassette-view">' +
+            '<div class="cassette"><div class="window"><div class="reel"></div><div class="reel"></div></div>' +
+            '<div class="label">SIDE A — MADE WITH LOVE</div></div>' +
+          '</div>' +
+          '<div class="viewer-vinyl-view" style="display:none;"><div class="vinyl"></div></div>';
+        container.appendChild(wrap);
+
+        var reels = wrap.querySelectorAll('.reel');
+        var vinylDisc = wrap.querySelector('.vinyl');
+        var cassetteView = wrap.querySelector('.viewer-cassette-view');
+        var vinylView = wrap.querySelector('.viewer-vinyl-view');
+        var fmtBtns = wrap.querySelectorAll('.viewer-fmt-btn');
+        fmtBtns.forEach(function(b){
+          b.addEventListener('click', function(){
+            fmtBtns.forEach(function(o){ o.classList.add('ghost'); });
+            b.classList.remove('ghost');
+            var isCassette = b.dataset.fmt === 'cassette';
+            cassetteView.style.display = isCassette ? 'block' : 'none';
+            vinylView.style.display = isCassette ? 'none' : 'block';
+          });
+        });
+        fmtBtns[0].classList.remove('ghost');
+
+        var tracksEl = document.createElement('div');
+        tracksEl.style.marginTop = '16px';
         (state.tracklist || []).forEach(function(t, idx){
           var row = document.createElement('div');
           row.className = 'track-row';
@@ -1809,9 +1891,15 @@
               '<iframe width="220" height="130" src="https://www.youtube.com/embed/' + t.url + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
           } else {
             row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span><audio controls src="' + t.url + '"></audio>';
+            var audio = row.querySelector('audio');
+            audio.addEventListener('play', function(){ reels.forEach(function(r){ r.classList.add('spin'); }); vinylDisc.classList.add('spin'); });
+            audio.addEventListener('pause', function(){ reels.forEach(function(r){ r.classList.remove('spin'); }); vinylDisc.classList.remove('spin'); });
+            audio.addEventListener('ended', function(){ reels.forEach(function(r){ r.classList.remove('spin'); }); vinylDisc.classList.remove('spin'); });
           }
-          container.appendChild(row);
+          tracksEl.appendChild(row);
         });
+        container.appendChild(tracksEl);
+
         if((state.linerNotes || '').trim()){
           var notes = document.createElement('div');
           notes.style.marginTop = '14px';
