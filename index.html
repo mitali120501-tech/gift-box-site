@@ -116,9 +116,9 @@
   /* ---------- WAX SEAL STAMP OVERLAY ---------- */
   .stamp-overlay{
     position:fixed; inset:0; background:rgba(43,36,32,0.35); display:flex; align-items:center; justify-content:center;
-    z-index:1000; opacity:0; transition:opacity .25s;
+    z-index:1000; opacity:0; pointer-events:none; transition:opacity .25s;
   }
-  .stamp-overlay.show{ opacity:1; }
+  .stamp-overlay.show{ opacity:1; pointer-events:auto; }
   .stamp-overlay .big-seal{
     width:120px; height:120px; border-radius:50%; background: radial-gradient(circle at 35% 30%, #9a3d3d, var(--maroon) 70%);
     box-shadow:0 10px 30px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center;
