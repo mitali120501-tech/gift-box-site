@@ -111,8 +111,6 @@
   .petal-layer{ position:fixed; inset:0; pointer-events:none; z-index:999; overflow:hidden; }
   .petal{ position:absolute; top:-20px; border-radius:60% 0 60% 0; animation: petal-fall linear forwards; }
   @keyframes petal-fall{ to{ transform: translateY(110vh) rotate(360deg); opacity:.2; } }
-  .vase-petal{ position:absolute; width:8px; height:8px; border-radius:60% 0 60% 0; background:var(--rose); animation: vase-petal-fall 1.6s ease-in forwards; pointer-events:none; }
-  @keyframes vase-petal-fall{ to{ transform: translateY(120px) rotate(180deg); opacity:0; } }
 
   /* ---------- WAX SEAL STAMP OVERLAY ---------- */
   .stamp-overlay{
@@ -232,12 +230,6 @@
   .tie-knot{ position:absolute; width:34px; height:17px; background:var(--gold); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.35); z-index:3; }
 
   .vase-scene{ position:relative; width:320px; height:340px; margin:10px auto 6px; }
-  .vase-svg{ position:absolute; z-index:2; }
-  .vase-stem{ position:absolute; width:66px; text-align:center; transform-origin:bottom center; z-index:3; cursor:pointer; }
-  .vase-stem img{ width:58px; height:58px; border-radius:50%; object-fit:cover; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,.25); position:relative; }
-  .vase-stem::after{ content:''; position:absolute; left:4px; top:0; width:58px; height:58px; border-radius:50%; pointer-events:none; mix-blend-mode:overlay; background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), transparent 55%); }
-  .vase-stem:hover{ transform:scale(1.05); }
-  @keyframes stem-sway{ 0%,100%{ transform: rotate(calc(-1 * var(--sway-amt, 2deg))); } 50%{ transform: rotate(var(--sway-amt, 2deg)); } }
   .vase-caption{ text-align:center; font-family:'Caveat', cursive; font-size:1.3rem; color:var(--maroon); margin-top:6px; }
 
   ol.howto{ padding-left:20px; }
@@ -1235,183 +1227,323 @@
     vaseBtn.disabled = false;
   });
 
-  // A vine, not a plain stem line: an organic bezier curl from a flower head down to
-  // the tie knot, with small leaf shapes sprouting along it — sampled analytically off
-  // the same curve (point + tangent formulas below) rather than drawn by hand.
-  var VASE_LEAF_D = 'M7 1 C12 3,12 9,7 13 C2 9,2 3,7 1 Z';
-  function vineBezierPoint(t, p0, p1, p2, p3){
-    var mt = 1 - t;
-    return [
-      mt*mt*mt*p0[0] + 3*mt*mt*t*p1[0] + 3*mt*t*t*p2[0] + t*t*t*p3[0],
-      mt*mt*mt*p0[1] + 3*mt*mt*t*p1[1] + 3*mt*t*t*p2[1] + t*t*t*p3[1]
-    ];
-  }
-  function vineBezierAngle(t, p0, p1, p2, p3){
-    var mt = 1 - t;
-    var dx = 3*mt*mt*(p1[0]-p0[0]) + 6*mt*t*(p2[0]-p1[0]) + 3*t*t*(p3[0]-p2[0]);
-    var dy = 3*mt*mt*(p1[1]-p0[1]) + 6*mt*t*(p2[1]-p1[1]) + 3*t*t*(p3[1]-p2[1]);
-    return Math.atan2(dy, dx) * 180 / Math.PI;
-  }
-  function vineSVG(x1, y1, x2, y2, seed){
-    var dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
-    var nx = -dy / len, ny = dx / len;
-    var curl = (sealSeededRandom(seed) - 0.5) * 40;
-    var p0 = [x1, y1], p3 = [x2, y2];
-    var p1 = [x1 + dx*0.28 + nx*curl, y1 + dy*0.28 + ny*curl];
-    var p2 = [x1 + dx*0.68 - nx*curl*0.6, y1 + dy*0.68 - ny*curl*0.6];
-    var d = 'M' + p0[0].toFixed(1) + ',' + p0[1].toFixed(1) +
-      ' C' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1) + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1) + ' ' + p3[0].toFixed(1) + ',' + p3[1].toFixed(1);
-    var svg = '<path d="' + d + '" stroke="#5C7A52" stroke-width="3.2" fill="none" stroke-linecap="round"/>';
-    [0.26, 0.5, 0.74].forEach(function(t, li){
-      var pt = vineBezierPoint(t, p0, p1, p2, p3);
-      var angle = vineBezierAngle(t, p0, p1, p2, p3);
-      var side = li % 2 === 0 ? 1 : -1;
-      var scale = 0.8 + sealSeededRandom(seed + li*3.7) * 0.5;
-      svg += '<g transform="translate(' + pt[0].toFixed(1) + ',' + pt[1].toFixed(1) + ') rotate(' + (angle + side*58).toFixed(1) + ') scale(' + scale.toFixed(2) + ') translate(-7,-7)">' +
-        '<path d="' + VASE_LEAF_D + '" fill="#6B8F71"/></g>';
-    });
-    return svg;
-  }
-
+  /* ================== BOUQUET IN THE VASE (canvas physics) ==================
+     Each stem is a verlet-integrated chain of points, anchored at the tie knot.
+     Points are pulled toward a rest curve (so the arrangement holds its fanned
+     shape the way stiff stems do) while inertia, a drifting breeze and distance
+     constraints between neighbours do the rest — so the bouquet sways on its own,
+     and if you grab a bloom and pull, the whole stem bends and springs back.     */
   function renderVaseScene(stems, target){
     target = target || vaseScene;
-    var W = 320, H = 340, vaseW = 140, vaseH = 140;
-    var vaseX = W / 2, vaseTopY = H - vaseH;
-    var tieX = vaseX, tieY = vaseTopY + 34;
+    var W = 320, H = 340, DPR = Math.min(window.devicePixelRatio || 1, 2);
+    var vaseTopY = H - 140;
+    var vaseX = W / 2;
+    var tieX = vaseX, tieY = vaseTopY + 22;
+    var waterY = vaseTopY + 52;
     var n = stems.length;
 
-    var heads = stems.map(function(s, i){
-      var angle = n > 1 ? (i / (n - 1) - 0.5) * 50 : 0;
-      return {
-        x: vaseX + Math.sin(angle * Math.PI / 180) * 78,
-        y: 62 + Math.abs(angle) * 0.6 + (i % 2 === 0 ? 0 : 10),
-        angle: angle
-      };
-    });
-
     target.innerHTML = '';
-
-    var vinesSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    vinesSvg.setAttribute('class', 'stems-svg');
-    vinesSvg.setAttribute('width', W); vinesSvg.setAttribute('height', H);
-    vinesSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    target.appendChild(vinesSvg);
-
-    target.insertAdjacentHTML('beforeend',
-      '<svg class="vase-svg" width="' + vaseW + '" height="' + vaseH + '" viewBox="0 0 140 140" ' +
-      'style="left:' + (vaseX - vaseW / 2) + 'px; top:' + vaseTopY + 'px;">' +
-        '<defs><linearGradient id="vaseGlaze" x1="0" y1="0" x2="1" y2="0">' +
-          '<stop offset="0%" stop-color="#9a4a4a"/><stop offset="55%" stop-color="#7A2E2E"/><stop offset="100%" stop-color="#5c2222"/>' +
-        '</linearGradient></defs>' +
-        '<path d="M50 20 L90 20 L100 60 C110 90 100 120 70 120 C40 120 30 90 40 60 Z" fill="url(#vaseGlaze)"/>' +
-        '<path d="M42 62 C34 88 42 112 70 112 C98 112 106 88 98 62 Z" fill="rgba(140,180,170,.32)"/>' +
-        '<rect x="40" y="60" width="60" height="2" fill="rgba(255,255,255,.35)"/>' +
-      '</svg>'
-    );
-
-    var knot = document.createElement('div');
-    knot.className = 'tie-knot';
-    knot.style.left = (tieX - 17) + 'px';
-    knot.style.top = (vaseTopY - 15) + 'px';
-    target.appendChild(knot);
-
-    var stemEls = heads.map(function(p, i){
-      var s = stems[i];
-      var el = document.createElement('div');
-      el.className = 'vase-stem';
-      el.innerHTML = '<img src="'+s.img+'" alt="'+s.title+'">';
-      target.appendChild(el);
-      return el;
-    });
+    target.style.display = 'block';
+    var canvas = document.createElement('canvas');
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'grab';
+    target.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
 
     var caption = document.createElement('div');
     caption.className = 'vase-caption';
-    caption.textContent = 'picked, tied, and settling into the vase — click a bloom for petals 🌿';
+    caption.textContent = 'tied and standing in the vase — pull a bloom and let it spring back';
     target.appendChild(caption);
-    target.style.display = 'block';
 
-    // Physics: each stem starts scattered above/outside its resting spot and is pulled
-    // in by a damped spring toward that spot, with a small rotational cross-term (an
-    // attractor-style coupling, in the spirit of the Lorentz system's swirl) so it
-    // curls into place instead of sliding in on a straight line.
-    var particles = heads.map(function(p, i){
+    // ---- build a rest curve per stem, then a rope of points along it
+    var SEG = 15;
+    var ropes = stems.map(function(s, i){
+      var spread = n > 1 ? (i / (n - 1) - 0.5) : 0;
+      var headX = vaseX + spread * 150;
+      var headY = 66 + Math.abs(spread) * 26 + (i % 2 ? 12 : 0);
+      var curl = (sealSeededRandom(i * 7.7 + 1) - 0.5) * 46;
+      var p0 = [tieX, tieY], p3 = [headX, headY];
+      var p1 = [tieX + (headX - tieX) * 0.15 + curl * 0.5, tieY - (tieY - headY) * 0.42];
+      var p2 = [headX - curl * 0.4, headY + (tieY - headY) * 0.36];
+      var rest = [], pts = [], prev = [], k, t, mt, x, y;
+      for(k = 0; k <= SEG; k++){
+        t = k / SEG; mt = 1 - t;
+        x = mt*mt*mt*p0[0] + 3*mt*mt*t*p1[0] + 3*mt*t*t*p2[0] + t*t*t*p3[0];
+        y = mt*mt*mt*p0[1] + 3*mt*mt*t*p1[1] + 3*mt*t*t*p2[1] + t*t*t*p3[1];
+        rest.push([x, y]); pts.push([x, y]); prev.push([x, y]);
+      }
+      var segLen = [];
+      for(k = 0; k < SEG; k++){
+        segLen.push(Math.hypot(rest[k+1][0] - rest[k][0], rest[k+1][1] - rest[k][1]));
+      }
+      var img = new Image();
+      img.src = s.img;
       return {
-        x: tieX + (p.x - tieX) * 2.3 + (sealSeededRandom(i*3.1) - 0.5) * 20,
-        y: p.y - 70 - sealSeededRandom(i*5.7) * 30,
-        vx: 0, vy: 0, tx: p.x, ty: p.y
+        data: s, rest: rest, pts: pts, prev: prev, segLen: segLen,
+        img: img, phase: sealSeededRandom(i * 3.3) * Math.PI * 2,
+        gust: 0.6 + sealSeededRandom(i * 5.1) * 0.9,
+        headR: 27 - Math.min(7, n),
+        leafAt: [4, 7, 10, 13]
       };
     });
 
-    function drawFrame(){
-      var inner = '';
-      particles.forEach(function(pt, i){
-        inner += vineSVG(pt.x, pt.y + 26, tieX, tieY, i * 9.2 + 1);
-        stemEls[i].style.left = (pt.x - 29) + 'px';
-        stemEls[i].style.top = (pt.y - 29) + 'px';
-      });
-      vinesSvg.innerHTML = inner;
-    }
-    drawFrame();
-
-    var k = 70, damping = 9, swirl = 0.9, lastT = null, settleStart = null;
-    function step(now){
-      if(settleStart === null) settleStart = now;
-      if(lastT === null) lastT = now;
-      var dt = Math.min((now - lastT) / 1000, 0.032);
-      lastT = now;
-      var moving = false;
-      particles.forEach(function(pt){
-        var dx = pt.tx - pt.x, dy = pt.ty - pt.y;
-        var dist = Math.hypot(dx, dy);
-        var decay = Math.min(1, dist / 50);
-        pt.vx += (dx*k - pt.vx*damping - dy*swirl*decay) * dt;
-        pt.vy += (dy*k - pt.vy*damping + dx*swirl*decay) * dt;
-        pt.x += pt.vx * dt; pt.y += pt.vy * dt;
-        if(dist > 0.4 || Math.hypot(pt.vx, pt.vy) > 0.4) moving = true;
-      });
-      drawFrame();
-      if(moving && now - settleStart < 4000){
-        requestAnimationFrame(step);
-      } else {
-        particles.forEach(function(pt){ pt.x = pt.tx; pt.y = pt.ty; pt.vx = 0; pt.vy = 0; });
-        drawFrame();
-        startIdleSway();
+    var petals = [];
+    function spawnPetals(x, y, count){
+      var cols = ['#B23A48', '#E8A0BC', '#D9A441', '#f2c14e'];
+      for(var i = 0; i < count; i++){
+        petals.push({
+          x: x, y: y,
+          vx: (Math.random() - 0.5) * 40,
+          vy: -10 - Math.random() * 30,
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random() - 0.5) * 6,
+          life: 1,
+          col: cols[Math.floor(Math.random() * 4)]
+        });
       }
     }
-    requestAnimationFrame(step);
 
-    function startIdleSway(){
-      stemEls.forEach(function(el, i){
-        el.style.setProperty('--sway-amt', ((sealSeededRandom(i*8.3) - 0.5) * 4).toFixed(1) + 'deg');
-        el.style.animation = 'stem-sway ' + (4 + sealSeededRandom(i*2.2) * 2).toFixed(1) + 's ease-in-out ' + (sealSeededRandom(i*6.6) * 2).toFixed(1) + 's infinite';
+    // ---- interaction: grab the nearest bloom
+    var grabbed = null, pointer = { x: 0, y: 0 };
+    function localPos(e){
+      var r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+    }
+    canvas.addEventListener('pointerdown', function(e){
+      var p = localPos(e);
+      pointer = p;
+      var best = null, bestD = 1e9;
+      ropes.forEach(function(rp){
+        var tip = rp.pts[SEG];
+        var d = Math.hypot(tip[0] - p.x, tip[1] - p.y);
+        if(d < rp.headR + 12 && d < bestD){ bestD = d; best = rp; }
       });
+      if(best){
+        grabbed = best;
+        canvas.style.cursor = 'grabbing';
+        try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+      } else {
+        spawnPetals(p.x, p.y, 3);
+      }
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function(e){
+      if(!grabbed) return;
+      pointer = localPos(e);
+    });
+    function release(){
+      if(!grabbed) return;
+      var tip = grabbed.pts[SEG];
+      spawnPetals(tip[0], tip[1], 2);
+      grabbed = null;
+      canvas.style.cursor = 'grab';
     }
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
 
-    function dropPetalAt(x, y){
-      var petal = document.createElement('div');
-      petal.className = 'vase-petal';
-      petal.style.background = ['#B23A48','#E8A0BC','#D9A441'][Math.floor(Math.random()*3)];
-      petal.style.left = x + 'px';
-      petal.style.top = y + 'px';
-      target.appendChild(petal);
-      setTimeout(function(){ petal.remove(); }, 1700);
-    }
-
-    stemEls.forEach(function(el){
-      el.addEventListener('click', function(e){
-        e.stopPropagation();
-        var rect = target.getBoundingClientRect(), elRect = el.getBoundingClientRect();
-        for(var b = 0; b < 3; b++){
-          dropPetalAt(elRect.left - rect.left + elRect.width/2 + (Math.random()*16 - 8), elRect.top - rect.top + elRect.height/2);
+    // ---- simulation
+    var K_REST = 26, DAMP = 0.90, ITER = 5;
+    function step(dt, t){
+      ropes.forEach(function(rp){
+        var breeze = (Math.sin(t * 0.7 + rp.phase) * 0.6 + Math.sin(t * 1.9 + rp.phase * 1.7) * 0.4) * rp.gust;
+        var i, j, it;
+        for(i = 1; i <= SEG; i++){
+          var p = rp.pts[i], pv = rp.prev[i], rs = rp.rest[i];
+          var vx = (p[0] - pv[0]) * DAMP, vy = (p[1] - pv[1]) * DAMP;
+          pv[0] = p[0]; pv[1] = p[1];
+          var tipness = i / SEG;
+          var ax = (rs[0] - p[0]) * K_REST + breeze * 26 * tipness;
+          var ay = (rs[1] - p[1]) * K_REST + 14;
+          p[0] += vx + ax * dt * dt;
+          p[1] += vy + ay * dt * dt;
+        }
+        if(rp === grabbed){
+          rp.pts[SEG][0] = pointer.x; rp.pts[SEG][1] = pointer.y;
+        }
+        for(it = 0; it < ITER; it++){
+          rp.pts[0][0] = tieX; rp.pts[0][1] = tieY;
+          for(j = 0; j < SEG; j++){
+            var a = rp.pts[j], b = rp.pts[j+1];
+            var dx = b[0] - a[0], dy = b[1] - a[1];
+            var d = Math.hypot(dx, dy) || 0.0001;
+            var diff = (d - rp.segLen[j]) / d * 0.5;
+            var ox = dx * diff, oy = dy * diff;
+            if(j > 0){ a[0] += ox; a[1] += oy; }
+            if(!(rp === grabbed && j + 1 === SEG)){ b[0] -= ox; b[1] -= oy; }
+          }
         }
       });
-    });
 
-    target.onclick = function(e){
-      if(e.target.closest('.vase-caption') || e.target.closest('.vase-stem')) return;
-      var rect = target.getBoundingClientRect();
-      dropPetalAt(e.clientX - rect.left, e.clientY - rect.top);
-    };
+      for(var pi = petals.length - 1; pi >= 0; pi--){
+        var pt = petals[pi];
+        pt.vy += 90 * dt;
+        pt.vx *= 0.99;
+        pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+        pt.rot += pt.vr * dt;
+        pt.life -= dt * 0.55;
+        if(pt.life <= 0 || pt.y > H + 20) petals.splice(pi, 1);
+      }
+    }
+
+    // ---- drawing
+    function strokeStem(rp){
+      var pts = rp.pts, i;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for(i = 1; i < pts.length - 1; i++){
+        var mx = (pts[i][0] + pts[i+1][0]) / 2, my = (pts[i][1] + pts[i+1][1]) / 2;
+        ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+      }
+      ctx.lineTo(pts[pts.length-1][0], pts[pts.length-1][1]);
+      ctx.stroke();
+    }
+    function drawLeaves(rp){
+      rp.leafAt.forEach(function(idx, li){
+        if(idx >= SEG) return;
+        var a = rp.pts[idx], b = rp.pts[idx+1];
+        var ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        var side = li % 2 ? 1 : -1;
+        ctx.save();
+        ctx.translate(a[0], a[1]);
+        ctx.rotate(ang + side * 1.05);
+        ctx.fillStyle = li % 2 ? '#6B8F71' : '#5f8265';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(9, -5, 17, 0);
+        ctx.quadraticCurveTo(9, 5, 0, 0);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(15, 0); ctx.stroke();
+        ctx.restore();
+      });
+    }
+    function drawHead(rp){
+      var tip = rp.pts[SEG], prev = rp.pts[SEG-1];
+      var ang = Math.atan2(tip[1] - prev[1], tip[0] - prev[0]) + Math.PI / 2;
+      var r = rp.headR;
+      ctx.save();
+      ctx.translate(tip[0], tip[1]);
+      ctx.rotate(ang);
+      ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.save();
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
+      if(rp.img.complete && rp.img.naturalWidth){
+        ctx.drawImage(rp.img, -r, -r, r * 2, r * 2);
+      } else {
+        ctx.fillStyle = '#E8A0BC';
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+      }
+      var lg = ctx.createRadialGradient(-r*0.35, -r*0.4, r*0.1, 0, 0, r);
+      lg.addColorStop(0, 'rgba(255,255,255,.45)');
+      lg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = lg; ctx.fillRect(-r, -r, r*2, r*2);
+      ctx.restore();
+      ctx.restore();
+    }
+    function vaseOutline(){
+      ctx.beginPath();
+      ctx.moveTo(vaseX - 40, vaseTopY);
+      ctx.lineTo(vaseX + 40, vaseTopY);
+      ctx.bezierCurveTo(vaseX + 52, vaseTopY + 40, vaseX + 46, vaseTopY + 118, vaseX + 12, vaseTopY + 122);
+      ctx.lineTo(vaseX - 12, vaseTopY + 122);
+      ctx.bezierCurveTo(vaseX - 46, vaseTopY + 118, vaseX - 52, vaseTopY + 40, vaseX - 40, vaseTopY);
+      ctx.closePath();
+    }
+    function drawVase(){
+      ctx.save();
+      vaseOutline();
+      ctx.save(); ctx.clip();
+      var wg = ctx.createLinearGradient(vaseX - 52, 0, vaseX + 52, 0);
+      wg.addColorStop(0, 'rgba(150,185,180,.34)');
+      wg.addColorStop(0.45, 'rgba(120,160,158,.22)');
+      wg.addColorStop(1, 'rgba(90,120,120,.34)');
+      ctx.fillStyle = wg;
+      ctx.fillRect(vaseX - 60, waterY, 120, 200);
+      ctx.fillStyle = 'rgba(255,255,255,.45)';
+      ctx.fillRect(vaseX - 60, waterY - 1.5, 120, 2);
+      ctx.restore();
+      var g = ctx.createLinearGradient(vaseX - 52, 0, vaseX + 52, 0);
+      g.addColorStop(0, 'rgba(215,225,225,.42)');
+      g.addColorStop(0.3, 'rgba(240,248,248,.16)');
+      g.addColorStop(0.72, 'rgba(140,160,165,.20)');
+      g.addColorStop(1, 'rgba(200,215,215,.40)');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+    }
+    // the submerged part of each stem, redrawn shifted and tinted so the glass
+    // and water visibly bend it — the giveaway that there is water in there
+    function drawRefracted(){
+      ctx.save();
+      vaseOutline(); ctx.clip();
+      ctx.beginPath(); ctx.rect(vaseX - 60, waterY, 120, 200); ctx.clip();
+      ctx.translate(vaseX, 0); ctx.scale(1.06, 1); ctx.translate(-vaseX, 0);
+      ctx.globalAlpha = 0.5;
+      ropes.forEach(function(rp){
+        ctx.strokeStyle = '#4f6d48'; ctx.lineWidth = 3.6; strokeStem(rp);
+      });
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    function draw(){
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+      ropes.forEach(function(rp){
+        ctx.strokeStyle = 'rgba(0,0,0,.13)'; ctx.lineWidth = 5.4;
+        ctx.save(); ctx.translate(2, 3); strokeStem(rp); ctx.restore();
+        ctx.strokeStyle = '#5C7A52'; ctx.lineWidth = 3.4; strokeStem(rp);
+        ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1;
+        ctx.save(); ctx.translate(-0.9, 0); strokeStem(rp); ctx.restore();
+        drawLeaves(rp);
+      });
+
+      // the tie: twine wound round where the stems cross
+      ctx.save();
+      ctx.translate(tieX, tieY);
+      ctx.fillStyle = '#C08A3E';
+      ctx.beginPath(); ctx.ellipse(0, 0, 19, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 1;
+      for(var i = -12; i <= 12; i += 6){
+        ctx.beginPath(); ctx.moveTo(i, -9); ctx.lineTo(i + 3, 9); ctx.stroke();
+      }
+      ctx.restore();
+
+      ropes.forEach(drawHead);
+      drawRefracted();
+      drawVase();
+
+      petals.forEach(function(pt){
+        ctx.save();
+        ctx.translate(pt.x, pt.y); ctx.rotate(pt.rot);
+        ctx.globalAlpha = Math.max(0, Math.min(1, pt.life));
+        ctx.fillStyle = pt.col;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    var last = null, clock = 0;
+    function frame(now){
+      if(!document.body.contains(canvas)) return;
+      if(last === null) last = now;
+      var dt = Math.min((now - last) / 1000, 0.033);
+      last = now; clock += dt;
+      step(dt, clock);
+      draw();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
   }
 
   vaseBtn.addEventListener('click', function(){
