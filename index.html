@@ -6,6 +6,7 @@
 <title>A Box For You</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Literata:ital,wght@0,400;0,600;1,400&family=Caveat:wght@500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
     --paper:#F7F1E1;
@@ -455,21 +456,24 @@
   .viewer-cassette-mixtape .track-row.now-playing .title{ color:var(--maroon); font-weight:600; }
   .viewer-cassette-mixtape .track-row.now-playing .title::before{ content:'▶ '; }
   .viewer-cassette-mixtape .track-row .title{ font-size:14px; }
-  .viewer-cassette-mixtape .cassette{ cursor:pointer; }
-  .viewer-cassette-mixtape .reel{ display:flex; align-items:center; justify-content:center; }
-  .viewer-cassette-mixtape .reel .tape-wound{ width:30px; height:30px; border-radius:50%; background:#C9A574; transition:width .2s linear, height .2s linear; }
-  .viewer-cassette-mixtape .tape-hint{ text-align:center; font-size:12px; color:#6b5f4e; margin:-4px 0 10px; }
-  .viewer-vinyl-view{ position:relative; width:210px; margin:0 auto 16px; }
-  .viewer-vinyl-view .vinyl{ margin:0; }
-  .viewer-vinyl-view .tonearm-base{ position:absolute; top:0; right:4px; width:18px; height:18px; border-radius:50%; background:#3B3532; box-shadow:0 2px 4px rgba(0,0,0,.4); z-index:4; }
-  .viewer-vinyl-view .tonearm-arm{
-    position:absolute; top:8px; right:12px; width:6px; height:96px; background:linear-gradient(180deg,#C9A574,#8a6b3f);
-    border-radius:3px; transform-origin: top center; transform: rotate(-32deg); transition: transform .6s cubic-bezier(.4,0,.2,1);
-    z-index:4; cursor:grab; touch-action:none;
-  }
-  .viewer-vinyl-view .tonearm-arm::after{ content:''; position:absolute; left:50%; bottom:-4px; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:#8a6b3f; box-shadow:0 1px 3px rgba(0,0,0,.4); }
-  .viewer-vinyl-view .tonearm-arm:active{ cursor:grabbing; }
-  .viewer-vinyl-view.playing .tonearm-arm{ transform: rotate(-4deg); }
+  /* ---- fully-simulated cassette deck ---- */
+  .tape-deck{ width:300px; margin:0 auto 14px; background:linear-gradient(180deg,#4a423a,#2e2822); border-radius:12px; padding:14px; box-shadow:0 10px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); }
+  .deck-window{ position:relative; background:#0d0b09; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,.7); overflow:hidden; }
+  .tape-canvas{ display:block; width:100%; height:auto; cursor:pointer; }
+  .deck-readout{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:12px; }
+  .tape-counter{ background:#111; border-radius:4px; padding:4px 8px; font-family:'Press Start 2P', monospace; font-size:12px; color:#e8d9a8; letter-spacing:2px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
+  .vu-meters{ display:flex; gap:4px; align-items:flex-end; height:22px; background:#111; border-radius:4px; padding:3px 5px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
+  .vu-bar{ width:6px; height:4%; border-radius:1px; background:linear-gradient(0deg,#6B8F71,#D9A441 70%,#B23A48 92%); transition:height .08s linear; }
+  .deck-controls{ display:flex; justify-content:center; gap:10px; margin-top:12px; }
+  .deck-btn{ width:44px; height:34px; border-radius:5px; border:none; background:linear-gradient(180deg,#5a5049,#332c26); color:#e8d9a8; font-size:15px; box-shadow:0 3px 0 #1c1713, 0 4px 6px rgba(0,0,0,.4); cursor:pointer; transition:transform .1s, box-shadow .1s; }
+  .deck-btn:active, .deck-btn.pressed{ transform:translateY(3px); box-shadow:0 0 0 #1c1713, 0 1px 2px rgba(0,0,0,.4); }
+  .deck-btn.play-btn.playing{ color:#D9A441; }
+  .deck-btn:disabled{ opacity:.4; cursor:default; }
+  .tape-hint{ text-align:center; font-size:12px; color:#6b5f4e; margin:8px 0 0; }
+  .viewer-vinyl-view{ position:relative; margin:0 auto 10px; }
+  .turntable-3d{ width:100%; max-width:420px; height:320px; margin:0 auto; border-radius:12px; overflow:hidden; background:radial-gradient(circle at 50% 30%, #2a2520, #14110e); touch-action:none; cursor:grab; }
+  .turntable-3d:active{ cursor:grabbing; }
+  .turntable-3d canvas{ display:block; }
   .viewer-format-switch{ position:relative; width:120px; height:38px; margin:0 auto 16px; background:#2B2420; border-radius:20px; padding:3px; cursor:pointer; box-shadow: inset 0 2px 5px rgba(0,0,0,.45); }
   .viewer-format-switch .fs-icon{ position:absolute; top:50%; transform:translateY(-50%); font-size:15px; opacity:.65; }
   .viewer-format-switch .fs-left{ left:11px; }
@@ -2181,44 +2185,340 @@
             '<div class="fs-knob"></div>' +
           '</div>' +
           '<div class="viewer-cassette-view">' +
-            '<div class="cassette"><div class="window">' +
-              '<div class="reel"><div class="tape-wound"></div></div>' +
-              '<div class="reel"><div class="tape-wound"></div></div>' +
-            '</div><div class="label">SIDE A — MADE WITH LOVE</div></div>' +
-            '<p class="tape-hint note">tap the cassette to play / pause</p>' +
+            '<div class="tape-deck">' +
+              '<div class="deck-window"><canvas class="tape-canvas" width="520" height="300"></canvas></div>' +
+              '<div class="deck-readout">' +
+                '<div class="tape-counter">00:00</div>' +
+                '<div class="vu-meters"><div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div></div>' +
+              '</div>' +
+              '<div class="deck-controls">' +
+                '<button class="deck-btn" data-action="rew" title="rewind">⏪</button>' +
+                '<button class="deck-btn play-btn" data-action="play" title="play/pause">▶</button>' +
+                '<button class="deck-btn" data-action="ff" title="fast-forward">⏩</button>' +
+                '<button class="deck-btn" data-action="eject" title="eject">⏏</button>' +
+              '</div>' +
+            '</div>' +
+            '<p class="tape-hint note">press ▶ to play, hold ⏪/⏩ to scrub, ⏏ to eject the tape</p>' +
           '</div>' +
           '<div class="viewer-vinyl-view" style="display:none;">' +
-            '<div class="vinyl"></div><div class="tonearm-base"></div><div class="tonearm-arm"></div>' +
+            '<div class="turntable-3d"></div>' +
+            '<p class="tape-hint note">drag the tonearm onto the record to play — drag it off to stop. drag the deck to look around.</p>' +
           '</div>';
         container.appendChild(wrap);
 
-        var reels = wrap.querySelectorAll('.reel');
-        var tapeWounds = wrap.querySelectorAll('.tape-wound');
-        var vinylDisc = wrap.querySelector('.vinyl');
-        var cassetteEl = wrap.querySelector('.cassette');
+        var tapeCanvas = wrap.querySelector('.tape-canvas');
+        var tapeCounterEl = wrap.querySelector('.tape-counter');
+        var vuBars = wrap.querySelectorAll('.vu-bar');
+        var playBtn = wrap.querySelector('.deck-btn[data-action="play"]');
+        var rewBtn = wrap.querySelector('.deck-btn[data-action="rew"]');
+        var ffBtn = wrap.querySelector('.deck-btn[data-action="ff"]');
+        var ejectBtn = wrap.querySelector('.deck-btn[data-action="eject"]');
         var cassetteView = wrap.querySelector('.viewer-cassette-view');
         var vinylView = wrap.querySelector('.viewer-vinyl-view');
         var fmtSwitch = wrap.querySelector('.viewer-format-switch');
+
+        /* =================== CASSETTE TRANSPORT (canvas simulation) ===================
+           Draws the actual mechanism: two tape packs whose radii follow the real
+           area-conservation relation (tape area is proportional to length wound), hubs
+           that therefore spin at genuinely different angular speeds (w = v / r, so the
+           supply reel visibly speeds up as it empties), a ribbon threaded off each pack
+           along true tangent lines, round the guide rollers and across the head block —
+           and a head block that rises into the shell's mouth on play and drops away
+           during fast-wind, the way a real deck lifts its heads off the tape.          */
+        var transport = (function(){
+          var ctx = tapeCanvas.getContext('2d');
+          var W = 260, H = 150, SCALE = 2;             // logical units, backing store is 2x
+          var HUB_L = { x: 90, y: 48 }, HUB_R = { x: 170, y: 48 };
+          var R_HUB = 11, R_FULL = 33;
+          var GUIDE_L = { x: 62, y: 124 }, GUIDE_R = { x: 198, y: 124 };
+          var HEAD_Y = 126;
+
+          var st = {
+            progress: 0,        // 0..1 through the tape
+            speed: 0,           // linear tape speed, logical units/sec (signed)
+            engaged: false,     // head block pressed against the tape
+            ejected: false,
+            angleL: 0, angleR: 0,
+            ribbonPhase: 0,
+            headOffset: 20,     // px the head block sits below its engaged position
+            shellOffset: 0,     // eject slide
+            label: 'no tape loaded'
+          };
+
+          function packRadius(fractionWound){
+            // area of the wound annulus scales with tape length, so r = sqrt(rh^2 + k*f)
+            return Math.sqrt(R_HUB*R_HUB + (R_FULL*R_FULL - R_HUB*R_HUB) * fractionWound);
+          }
+          // tangent point on a circle from an external point, picking the side the tape leaves on
+          function tangentPoint(c, r, p, sign){
+            var dx = p.x - c.x, dy = p.y - c.y;
+            var d = Math.hypot(dx, dy);
+            if(d <= r + 0.5) return { x: c.x + (dx/d)*r, y: c.y + (dy/d)*r };
+            var a = Math.atan2(dy, dx), b = Math.acos(r / d);
+            var t = a + sign * b;
+            return { x: c.x + Math.cos(t)*r, y: c.y + Math.sin(t)*r };
+          }
+          function roundRect(x, y, w, h, r){
+            ctx.beginPath();
+            ctx.moveTo(x+r, y);
+            ctx.arcTo(x+w, y, x+w, y+h, r);
+            ctx.arcTo(x+w, y+h, x, y+h, r);
+            ctx.arcTo(x, y+h, x, y, r);
+            ctx.arcTo(x, y, x+w, y, r);
+            ctx.closePath();
+          }
+          function hub(cx, cy, angle){
+            ctx.save();
+            ctx.translate(cx, cy); ctx.rotate(angle);
+            ctx.fillStyle = '#241d18';
+            ctx.beginPath(); ctx.arc(0, 0, R_HUB, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#0f0c0a';
+            for(var i = 0; i < 6; i++){                 // the six drive teeth
+              var a = (i / 6) * Math.PI * 2;
+              ctx.save(); ctx.rotate(a);
+              ctx.fillRect(-1.6, -R_HUB + 1, 3.2, 5);
+              ctx.restore();
+            }
+            ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+          }
+
+          function draw(){
+            ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+            ctx.clearRect(0, 0, W, H);
+
+            var shellY = st.shellOffset;
+
+            // ---- deck interior behind the cassette
+            ctx.fillStyle = '#0d0b09';
+            ctx.fillRect(0, 0, W, H);
+
+            ctx.save();
+            ctx.translate(0, shellY);
+
+            // ---- shell body
+            var g = ctx.createLinearGradient(0, 4, 0, H-4);
+            g.addColorStop(0, '#d8b788'); g.addColorStop(0.5, '#c09a68'); g.addColorStop(1, '#9d7b4f');
+            ctx.fillStyle = g;
+            roundRect(4, 6, W-8, 136, 7); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+
+            // screws
+            ctx.fillStyle = '#6f5636';
+            [[14,18],[246,18],[14,130],[246,130]].forEach(function(p){
+              ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI*2); ctx.fill();
+            });
+
+            // ---- clear window
+            ctx.save();
+            roundRect(50, 12, 160, 74, 5);
+            ctx.fillStyle = 'rgba(20,16,12,.82)'; ctx.fill();
+            ctx.clip();
+
+            var rl = packRadius(1 - st.progress), rr = packRadius(st.progress);
+
+            // wound tape packs, with a faint spiral so rotation reads on the pack itself
+            [[HUB_L, rl, st.angleL], [HUB_R, rr, st.angleR]].forEach(function(p){
+              var c = p[0], r = p[1], ang = p[2];
+              var pg = ctx.createRadialGradient(c.x - r*0.3, c.y - r*0.3, r*0.2, c.x, c.y, r);
+              pg.addColorStop(0, '#6b5436'); pg.addColorStop(1, '#3a2c1b');
+              ctx.fillStyle = pg;
+              ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI*2); ctx.fill();
+              ctx.save();
+              ctx.translate(c.x, c.y); ctx.rotate(ang);
+              ctx.strokeStyle = 'rgba(255,225,170,.10)'; ctx.lineWidth = 0.7;
+              ctx.beginPath();
+              for(var a = 0; a < Math.PI*6; a += 0.15){
+                var rr2 = R_HUB + (r - R_HUB) * (a / (Math.PI*6));
+                var x = Math.cos(a)*rr2, y = Math.sin(a)*rr2;
+                if(a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+              ctx.restore();
+            });
+            ctx.restore();
+
+            // ---- mouth: the opening along the bottom that the heads rise into
+            ctx.fillStyle = '#120f0c';
+            roundRect(54, 110, 152, 32, 2); ctx.fill();
+
+            // ---- the tape ribbon: true tangents off each pack, round the guides,
+            //      bowed forward across the head face when the heads are engaged
+            var tl = tangentPoint(HUB_L, rl, GUIDE_L, 1);
+            var tr = tangentPoint(HUB_R, rr, GUIDE_R, -1);
+            var bow = st.engaged ? 3.5 : 0;
+
+            function ribbonPath(){
+              ctx.beginPath();
+              ctx.moveTo(tl.x, tl.y);
+              ctx.arcTo(GUIDE_L.x, GUIDE_L.y, GUIDE_R.x, GUIDE_R.y, 7);
+              ctx.lineTo(118, HEAD_Y + bow);
+              ctx.quadraticCurveTo(145, HEAD_Y + bow*1.6, 172, HEAD_Y + bow);
+              ctx.arcTo(GUIDE_R.x, GUIDE_R.y, tr.x, tr.y, 7);
+              ctx.lineTo(tr.x, tr.y);
+            }
+            ctx.lineCap = 'butt';
+            ribbonPath();
+            ctx.strokeStyle = '#2a2015'; ctx.lineWidth = 3.4; ctx.stroke();
+            ribbonPath();
+            ctx.strokeStyle = 'rgba(196,158,96,.55)'; ctx.lineWidth = 1;
+            ctx.setLineDash([6, 9]); ctx.lineDashOffset = st.ribbonPhase;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // ---- hubs on top of their packs
+            hub(HUB_L.x, HUB_L.y, st.angleL);
+            hub(HUB_R.x, HUB_R.y, st.angleR);
+
+            // ---- guide rollers
+            [GUIDE_L, GUIDE_R].forEach(function(gp){
+              ctx.fillStyle = '#3d332a';
+              ctx.beginPath(); ctx.arc(gp.x, gp.y, 5, 0, Math.PI*2); ctx.fill();
+              ctx.fillStyle = '#8d7a5f';
+              ctx.beginPath(); ctx.arc(gp.x, gp.y, 2, 0, Math.PI*2); ctx.fill();
+            });
+
+            // ---- label, sitting on the shell face above the tape run
+            ctx.fillStyle = '#f6efdd';
+            roundRect(64, 90, 132, 17, 2); ctx.fill();
+            ctx.fillStyle = '#7A2E2E';
+            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', 69, 99);
+            ctx.textAlign = 'center';
+            var lbl = st.label.length > 17 ? st.label.slice(0, 16) + '…' : st.label;
+            ctx.fillStyle = '#2B2420';
+            ctx.fillText(lbl, 133, 99);
+            ctx.textAlign = 'left';
+
+            ctx.restore();
+
+            // ---- head block (belongs to the deck, so it does NOT move on eject)
+            ctx.save();
+            ctx.translate(0, st.headOffset);
+            ctx.fillStyle = '#2a2622';
+            roundRect(74, 142, 112, 10, 3); ctx.fill();
+            // erase head
+            ctx.fillStyle = '#5c5650'; roundRect(88, 122, 13, 22, 2); ctx.fill();
+            // record / playback head, with its gap
+            var hg = ctx.createLinearGradient(117, 0, 142, 0);
+            hg.addColorStop(0, '#6e665d'); hg.addColorStop(0.5, '#9a9188'); hg.addColorStop(1, '#5d564e');
+            ctx.fillStyle = hg; roundRect(117, 116, 25, 28, 2); ctx.fill();
+            ctx.fillStyle = '#241f1a'; ctx.fillRect(129, 116, 1.6, 28);
+            // pinch roller pressing the tape against the spinning capstan
+            ctx.fillStyle = '#1d1a17';
+            ctx.beginPath(); ctx.arc(171, 128, 9, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1;
+            ctx.save(); ctx.translate(171, 128); ctx.rotate(st.angleR * 1.6);
+            ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.stroke(); ctx.restore();
+            ctx.fillStyle = '#b9b2a6';
+            ctx.beginPath(); ctx.arc(181, 128, 4.5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            // ---- glass shine over the whole window
+            var sg = ctx.createLinearGradient(0, 0, W*0.6, H);
+            sg.addColorStop(0, 'rgba(255,255,255,.07)');
+            sg.addColorStop(0.45, 'rgba(255,255,255,0)');
+            ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+          }
+
+          var last = null;
+          function tick(now){
+            if(last === null) last = now;
+            var dt = Math.min((now - last) / 1000, 0.05);
+            last = now;
+
+            // ease the mechanical parts toward their targets
+            var headTarget = (st.engaged && !st.ejected) ? 0 : 20;
+            st.headOffset += (headTarget - st.headOffset) * Math.min(1, dt * 9);
+            var shellTarget = st.ejected ? 46 : 0;
+            st.shellOffset += (shellTarget - st.shellOffset) * Math.min(1, dt * 7);
+
+            if(Math.abs(st.speed) > 0.01){
+              var rl = packRadius(1 - st.progress), rr = packRadius(st.progress);
+              // constant *linear* speed means each reel turns at its own rate: w = v / r
+              st.angleL += (st.speed / rl) * dt;
+              st.angleR += (st.speed / rr) * dt;
+              st.ribbonPhase -= st.speed * dt * 2.2;
+            }
+            draw();
+            requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+
+          return {
+            setProgress: function(p){ st.progress = Math.max(0, Math.min(1, p || 0)); },
+            setSpeed: function(v){ st.speed = v; },
+            setEngaged: function(v){ st.engaged = v; },
+            setEjected: function(v){ st.ejected = v; },
+            setLabel: function(s){ st.label = s; }
+          };
+        })();
+
         fmtSwitch.addEventListener('click', function(){
           var toVinyl = !fmtSwitch.classList.contains('vinyl');
           fmtSwitch.classList.toggle('vinyl', toVinyl);
           cassetteView.style.display = toVinyl ? 'none' : 'block';
           vinylView.style.display = toVinyl ? 'block' : 'none';
+          if(toVinyl) turntable.resize();
         });
 
         function setSpinning(spinning){
-          reels.forEach(function(r){ r.classList.toggle('spin', spinning); });
-          vinylDisc.classList.toggle('spin', spinning);
-          vinylView.classList.toggle('playing', spinning);
+          transport.setSpeed(spinning ? 26 : 0);
+          transport.setEngaged(spinning);
+          turntable.setPlaying(spinning);
+          playBtn.textContent = spinning ? '⏸' : '▶';
+          playBtn.classList.toggle('playing', spinning);
         }
         function setTapeProgress(p){
-          var leftSize = 30 - p*20, rightSize = 10 + p*20;
-          tapeWounds[0].style.width = leftSize + 'px'; tapeWounds[0].style.height = leftSize + 'px';
-          tapeWounds[1].style.width = rightSize + 'px'; tapeWounds[1].style.height = rightSize + 'px';
+          transport.setProgress(p);
+          turntable.setProgress(p);
+        }
+        function formatCounter(t){
+          if(!isFinite(t)) t = 0;
+          var m = Math.floor(t / 60), s = Math.floor(t % 60);
+          return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
         }
 
         var tracks = [];
         var active = null;
+        var ejected = false;
+
+        /* ---- best-effort real audio analysis for the VU meters (falls back to a
+           resting level for cross-origin sources without CORS, or youtube tracks) ---- */
+        var audioCtx = null;
+        function getAnalyser(rec){
+          if(rec.media.type !== 'audio') return null;
+          if(rec._analyser !== undefined) return rec._analyser;
+          try{
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            var src = audioCtx.createMediaElementSource(rec.media.el);
+            var an = audioCtx.createAnalyser();
+            an.fftSize = 64;
+            src.connect(an);
+            an.connect(audioCtx.destination);
+            rec._analyser = an;
+          } catch(e){ rec._analyser = null; }
+          return rec._analyser;
+        }
+        var vuData = new Uint8Array(32);
+        function vuTick(){
+          var an = active ? getAnalyser(active) : null;
+          if(an && active && active.media.type === 'audio' && !active.media.el.paused){
+            an.getByteFrequencyData(vuData);
+            var avg = 0;
+            for(var i = 0; i < vuData.length; i++) avg += vuData[i];
+            avg /= vuData.length;
+            vuBars.forEach(function(bar, bi){
+              var lvl = Math.min(100, Math.max(4, (avg / 255) * 100 * (0.85 + bi * 0.1) + Math.random() * 10));
+              bar.style.height = lvl + '%';
+            });
+          } else {
+            vuBars.forEach(function(bar){ bar.style.height = '4%'; });
+          }
+          requestAnimationFrame(vuTick);
+        }
+        requestAnimationFrame(vuTick);
 
         function updateSpin(){
           var playing = tracks.some(function(r){
@@ -2238,13 +2538,16 @@
           if(active === rec) active = null;
         }
         function playTrack(rec){
+          if(ejected) return;
           if(active && active !== rec) stopTrack(active);
           active = rec;
+          transport.setLabel(rec.title);
           rec.row.classList.add('now-playing');
           if(rec.media.type === 'audio'){ rec.media.el.play(); }
           else { postYT(rec, 'playVideo'); rec.ytPlaying = true; updateSpin(); }
         }
         function toggleTrack(rec){
+          if(ejected) return;
           if(active === rec){
             if(rec.media.type === 'audio'){ if(rec.media.el.paused) rec.media.el.play(); else rec.media.el.pause(); }
             else { stopTrack(rec); }
@@ -2253,47 +2556,306 @@
           }
         }
         function toggleActiveOrFirst(){
+          if(ejected) return;
           if(active) toggleTrack(active);
           else if(tracks.length) playTrack(tracks[0]);
         }
-        cassetteEl.addEventListener('click', toggleActiveOrFirst);
+        playBtn.addEventListener('click', toggleActiveOrFirst);
 
         function isPlayingRec(rec){ return rec.media.type === 'audio' ? !rec.media.el.paused : !!rec.ytPlaying; }
 
-        var tonearmArm = wrap.querySelector('.tonearm-arm');
-        var ARM_REST = -32, ARM_PLAY = -4;
-        var draggingArm = false, lastArmAngle = ARM_REST;
-        tonearmArm.addEventListener('pointerdown', function(e){
-          e.preventDefault(); e.stopPropagation();
-          draggingArm = true;
-          tonearmArm.style.transition = 'none';
-          try{ tonearmArm.setPointerCapture(e.pointerId); }catch(err){}
-        });
-        tonearmArm.addEventListener('pointermove', function(e){
-          if(!draggingArm) return;
-          var rect = tonearmArm.getBoundingClientRect();
-          var pivotX = rect.left + rect.width / 2, pivotY = rect.top;
-          var dx = e.clientX - pivotX, dy = e.clientY - pivotY;
-          var angle = Math.atan2(dx, dy) * 180 / Math.PI;
-          angle = Math.max(ARM_REST, Math.min(ARM_PLAY, angle));
-          lastArmAngle = angle;
-          tonearmArm.style.transform = 'rotate(' + angle + 'deg)';
-        });
-        function endArmDrag(){
-          if(!draggingArm) return;
-          draggingArm = false;
-          tonearmArm.style.transition = '';
-          tonearmArm.style.transform = '';
-          var wantPlay = lastArmAngle > (ARM_REST + ARM_PLAY) / 2;
-          if(wantPlay){
-            if(!active){ if(tracks.length) playTrack(tracks[0]); }
-            else if(!isPlayingRec(active)){ playTrack(active); }
-          } else if(active && isPlayingRec(active)){
-            stopTrack(active);
-          }
+        function setEjected(v){
+          ejected = v;
+          transport.setEjected(v);
+          playBtn.disabled = v; rewBtn.disabled = v; ffBtn.disabled = v;
+          if(v && active) stopTrack(active);
         }
-        tonearmArm.addEventListener('pointerup', endArmDrag);
-        tonearmArm.addEventListener('pointercancel', endArmDrag);
+        ejectBtn.addEventListener('click', function(){ setEjected(!ejected); });
+        tapeCanvas.addEventListener('click', function(){
+          if(ejected) setEjected(false);
+          else toggleActiveOrFirst();
+        });
+
+        var scrubInterval = null;
+        function startScrub(dir){
+          if(ejected || !active || active.media.type !== 'audio') return;
+          // real decks lift the heads off the tape to fast-wind, and the tape flies
+          transport.setEngaged(false);
+          transport.setSpeed(dir * 150);
+          scrubInterval = setInterval(function(){
+            var el = active.media.el;
+            el.currentTime = Math.max(0, Math.min(el.duration || el.currentTime, el.currentTime + dir * 1.4));
+          }, 90);
+        }
+        function stopScrub(){
+          if(scrubInterval){ clearInterval(scrubInterval); scrubInterval = null; updateSpin(); }
+        }
+        rewBtn.addEventListener('pointerdown', function(){ startScrub(-1); });
+        ffBtn.addEventListener('pointerdown', function(){ startScrub(1); });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(function(ev){
+          rewBtn.addEventListener(ev, stopScrub);
+          ffBtn.addEventListener(ev, stopScrub);
+        });
+
+        /* ===================== TURNTABLE (WebGL / three.js) =====================
+           A real lit 3D deck: plinth, felt-topped platter, a vinyl disc whose grooves
+           are a procedurally-drawn texture, and a tonearm assembly (pivot, counterweight,
+           tube, headshell, stylus) you physically drag onto the record to start it. The
+           specular highlight sweeping the grooves as it turns is the whole point of
+           doing this in GL rather than CSS. Falls back silently if WebGL is missing.  */
+        var turntable = (function(){
+          var mount = wrap.querySelector('.turntable-3d');
+          var noop = { setPlaying:function(){}, setProgress:function(){}, resize:function(){} };
+          if(typeof THREE === 'undefined') return noop;
+
+          var renderer;
+          try{
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          } catch(e){ return noop; }
+
+          var w = mount.clientWidth || 420, h = mount.clientHeight || 320;
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(w, h);
+          mount.appendChild(renderer.domElement);
+
+          var CAM_R = 7.6, CAM_Y = 6.6;
+          var scene = new THREE.Scene();
+          var camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+          camera.position.set(0, CAM_Y, CAM_R);
+          camera.lookAt(0, 0.4, 0);
+
+          scene.add(new THREE.AmbientLight(0xffeedd, 0.42));
+          var key = new THREE.DirectionalLight(0xfff3dd, 1.15);
+          key.position.set(-5, 9, 4); scene.add(key);
+          var rim = new THREE.DirectionalLight(0xc9a574, 0.6);
+          rim.position.set(6, 4, -6); scene.add(rim);
+          var glint = new THREE.PointLight(0xffffff, 0.75, 26);
+          glint.position.set(2.4, 5.2, 3.2); scene.add(glint);
+
+          // ---- plinth
+          var plinth = new THREE.Mesh(
+            new THREE.BoxGeometry(11, 1.1, 9),
+            new THREE.MeshStandardMaterial({ color: 0x2f2822, roughness: 0.75, metalness: 0.12 })
+          );
+          plinth.position.y = -0.55; scene.add(plinth);
+
+          // ---- platter
+          var platter = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.5, 3.5, 0.42, 64),
+            new THREE.MeshStandardMaterial({ color: 0x4a423a, roughness: 0.55, metalness: 0.5 })
+          );
+          platter.position.y = 0.2; scene.add(platter);
+
+          // ---- vinyl: grooves drawn procedurally into a texture
+          function recordTexture(){
+            var c = document.createElement('canvas');
+            c.width = c.height = 1024;
+            var g = c.getContext('2d');
+            g.fillStyle = '#0a0a0b'; g.fillRect(0, 0, 1024, 1024);
+            var cx = 512, cy = 512;
+            for(var r = 150; r < 500; r += 2.2){
+              g.beginPath();
+              g.arc(cx, cy, r, 0, Math.PI * 2);
+              g.strokeStyle = 'rgba(255,255,255,' + (0.020 + Math.random() * 0.030) + ')';
+              g.lineWidth = 1;
+              g.stroke();
+            }
+            // the wider "land" bands between tracks
+            [214, 268, 322, 376, 430].forEach(function(r){
+              g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2);
+              g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = 4; g.stroke();
+            });
+            // paper label
+            g.beginPath(); g.arc(cx, cy, 148, 0, Math.PI * 2);
+            g.fillStyle = '#7A2E2E'; g.fill();
+            g.beginPath(); g.arc(cx, cy, 148, 0, Math.PI * 2);
+            g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 3; g.stroke();
+            g.fillStyle = '#f2dcb8';
+            g.font = 'bold 40px Georgia, serif';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillText('SIDE A', cx, cy - 34);
+            g.font = '26px Georgia, serif';
+            g.fillText('made with love', cx, cy + 30);
+            g.beginPath(); g.arc(cx, cy, 15, 0, Math.PI * 2);
+            g.fillStyle = '#14110e'; g.fill();
+            var tex = new THREE.CanvasTexture(c);
+            tex.anisotropy = 8;
+            return tex;
+          }
+          var record = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.25, 3.25, 0.06, 128),
+            [
+              new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.42, metalness: 0.35 }),
+              new THREE.MeshStandardMaterial({ map: recordTexture(), roughness: 0.28, metalness: 0.45 }),
+              new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.5, metalness: 0.3 })
+            ]
+          );
+          record.position.y = 0.44; scene.add(record);
+
+          var spindle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.075, 0.075, 0.7, 16),
+            new THREE.MeshStandardMaterial({ color: 0xcfc8bb, roughness: 0.25, metalness: 0.9 })
+          );
+          spindle.position.y = 0.62; scene.add(spindle);
+
+          // ---- tonearm assembly. Pivot sits off the platter; the arm's effective
+          //      length is set so the stylus sweeps from the outer groove down to just
+          //      outside the label — the geometry was solved numerically, not guessed.
+          var ARM_L = 2.55;
+          var armPivot = new THREE.Object3D();
+          armPivot.position.set(3.4, 0.82, -2.2);
+          scene.add(armPivot);
+
+          var metal = new THREE.MeshStandardMaterial({ color: 0xb9b2a6, roughness: 0.25, metalness: 0.85 });
+          var dark = new THREE.MeshStandardMaterial({ color: 0x27231f, roughness: 0.5, metalness: 0.4 });
+
+          var base = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.7, 24), dark);
+          base.position.set(3.4, 0.35, -2.2); scene.add(base);
+
+          var tube = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 3.3, 16), metal);
+          tube.rotation.z = Math.PI / 2;
+          tube.position.set(-1.1, 0, 0);
+          armPivot.add(tube);
+
+          var weight = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 20), dark);
+          weight.rotation.z = Math.PI / 2;
+          weight.position.set(0.68, 0, 0);
+          armPivot.add(weight);
+
+          var headshell = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.36), dark);
+          headshell.position.set(-2.42, -0.12, 0);
+          armPivot.add(headshell);
+
+          var stylus = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 10), metal);
+          stylus.position.set(-ARM_L, -0.3, 0);
+          armPivot.add(stylus);
+
+          // radians about Y: rest (off the record), lead-in groove, run-out near the label
+          var ARM_REST = -0.62, ARM_LEADIN = -0.33, ARM_END = 0.42;
+
+          // arm rest post, placed exactly where the stylus parks
+          var restPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.55, 12), dark);
+          restPost.position.set(
+            3.4 - ARM_L * Math.cos(ARM_REST), 0.42, -2.2 + ARM_L * Math.sin(ARM_REST)
+          );
+          scene.add(restPost);
+
+          var armAngle = ARM_REST, armTargetAngle = ARM_REST;
+          var armLift = 0.22, armLiftTarget = 0.22;                  // raised height
+          var playing = false, progress = 0, spin = 0, dragging = false;
+          var orbit = 0, orbitTarget = 0, dragMode = null, lastX = 0;
+
+          var raycaster = new THREE.Raycaster();
+          var recordPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.5);
+          var ndc = new THREE.Vector2();
+          var hitPoint = new THREE.Vector3();
+
+          function project(v){
+            var p = v.clone().project(camera);
+            return { x: (p.x * 0.5 + 0.5) * w, y: (-p.y * 0.5 + 0.5) * h };
+          }
+          // cast the pointer onto the record's plane, then solve for the arm rotation
+          // that puts the stylus over that point (exact inverse of the arm's kinematics)
+          function pointerToArmAngle(e){
+            var r = mount.getBoundingClientRect();
+            ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+            ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+            raycaster.setFromCamera(ndc, camera);
+            if(!raycaster.ray.intersectPlane(recordPlane, hitPoint)) return null;
+            return Math.atan2(hitPoint.z - armPivot.position.z, -(hitPoint.x - armPivot.position.x));
+          }
+
+          mount.addEventListener('pointerdown', function(e){
+            var r = mount.getBoundingClientRect();
+            var px = e.clientX - r.left, py = e.clientY - r.top;
+            var sv = new THREE.Vector3(); stylus.getWorldPosition(sv);
+            var sp = project(sv);
+            lastX = e.clientX;
+            // grabbing near the stylus means you're handling the arm; otherwise you orbit
+            dragMode = Math.hypot(px - sp.x, py - sp.y) < 70 ? 'arm' : 'orbit';
+            dragging = true;
+            try{ mount.setPointerCapture(e.pointerId); }catch(err){}
+            e.preventDefault();
+          });
+          mount.addEventListener('pointermove', function(e){
+            if(!dragging) return;
+            if(dragMode === 'orbit'){
+              orbitTarget += (e.clientX - lastX) * 0.006;
+              orbitTarget = Math.max(-0.7, Math.min(0.7, orbitTarget));
+              lastX = e.clientX;
+              return;
+            }
+            var a = pointerToArmAngle(e);
+            if(a === null) return;
+            armTargetAngle = Math.max(ARM_REST, Math.min(ARM_END, a));
+            armLiftTarget = 0.02;                    // lowered while you're handling it
+          });
+          function endDrag(){
+            if(!dragging) return;
+            dragging = false;
+            if(dragMode === 'arm'){
+              var onRecord = armTargetAngle > (ARM_REST + ARM_LEADIN) / 2;
+              if(onRecord){
+                armLiftTarget = 0;
+                if(!active){ if(tracks.length) playTrack(tracks[0]); }
+                else if(!isPlayingRec(active)){ playTrack(active); }
+              } else {
+                armTargetAngle = ARM_REST; armLiftTarget = 0.22;
+                if(active && isPlayingRec(active)) stopTrack(active);
+              }
+            }
+            dragMode = null;
+          }
+          mount.addEventListener('pointerup', endDrag);
+          mount.addEventListener('pointercancel', endDrag);
+          mount.addEventListener('pointerleave', endDrag);
+
+          var last = null;
+          function frame(now){
+            if(last === null) last = now;
+            var dt = Math.min((now - last) / 1000, 0.05);
+            last = now;
+
+            if(playing){
+              spin += dt * (33.333 / 60) * Math.PI * 2;   // genuine 33⅓ rpm
+              if(!dragging){
+                // the arm tracks inward across the record as the side plays
+                armTargetAngle = ARM_LEADIN + (ARM_END - ARM_LEADIN) * progress;
+                armLiftTarget = 0;
+              }
+            }
+            record.rotation.y = spin;
+            platter.rotation.y = spin;
+
+            armAngle += (armTargetAngle - armAngle) * Math.min(1, dt * (dragging ? 22 : 5));
+            armLift += (armLiftTarget - armLift) * Math.min(1, dt * 7);
+            armPivot.rotation.y = armAngle;
+            armPivot.position.y = 0.82 + armLift;
+
+            orbit += (orbitTarget - orbit) * Math.min(1, dt * 5);
+            camera.position.x = Math.sin(orbit) * CAM_R;
+            camera.position.z = Math.cos(orbit) * CAM_R;
+            camera.position.y = CAM_Y;
+            camera.lookAt(0, 0.4, 0);
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(frame);
+          }
+          requestAnimationFrame(frame);
+
+          return {
+            setPlaying: function(v){
+              playing = v;
+              if(!v && !dragging){ armTargetAngle = ARM_REST; armLiftTarget = 0.22; }
+            },
+            setProgress: function(p){ progress = Math.max(0, Math.min(1, p || 0)); },
+            resize: function(){
+              w = mount.clientWidth || w; h = mount.clientHeight || h;
+              renderer.setSize(w, h);
+              camera.aspect = w / h; camera.updateProjectionMatrix();
+            }
+          };
+        })();
 
         var tracksEl = document.createElement('div');
         tracksEl.style.marginTop = '16px';
@@ -2301,7 +2863,7 @@
           var row = document.createElement('div');
           row.className = 'track-row';
           row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span>';
-          var rec = { row: row };
+          var rec = { row: row, title: t.title || 'untitled' };
           if(t.type === 'youtube'){
             var iframe = document.createElement('iframe');
             iframe.width = '2'; iframe.height = '2';
@@ -2314,19 +2876,24 @@
             rec.media = { type:'youtube', iframe: iframe };
           } else {
             var audio = document.createElement('audio');
+            audio.crossOrigin = 'anonymous';
             audio.src = t.url;
             audio.style.display = 'none';
             row.appendChild(audio);
             rec.media = { type:'audio', el: audio };
-            audio.addEventListener('play', function(){ active = rec; row.classList.add('now-playing'); updateSpin(); });
+            audio.addEventListener('play', function(){ active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); });
             audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); });
             audio.addEventListener('ended', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); setTapeProgress(0); });
-            audio.addEventListener('timeupdate', function(){ if(audio.duration) setTapeProgress(audio.currentTime / audio.duration); });
+            audio.addEventListener('timeupdate', function(){
+              if(audio.duration) setTapeProgress(audio.currentTime / audio.duration);
+              if(active === rec) tapeCounterEl.textContent = formatCounter(audio.currentTime);
+            });
           }
           row.addEventListener('click', function(){ toggleTrack(rec); });
           tracks.push(rec);
           tracksEl.appendChild(row);
         });
+        if(tracks.length) transport.setLabel(tracks[0].title);
         container.appendChild(tracksEl);
 
         if((state.linerNotes || '').trim()){
