@@ -439,7 +439,6 @@
     </div>
     <div class="step-caption" id="stepCaption">Step 1 — untie the ribbon</div>
     <button id="stepBtn">Untie the ribbon</button>
-    <div style="margin-top:14px;"><a href="#" id="allGiftsLink" class="hand" style="font-size:1.15rem;">🎁 see all the gifts people have built →</a></div>
   </div>
 
   <div class="stamp-overlay" id="stampOverlay"><div class="big-seal" id="bigSeal">✦</div></div>
@@ -448,7 +447,10 @@
   <div id="viewerScreen" class="viewer-screen" style="display:none;">
     <div class="viewer-header">
       <h1 id="viewerTitle">A Box For You</h1>
-      <button class="small ghost" id="viewerNewBoxBtn">🎁 make your own box</button>
+      <div>
+        <button class="small ghost" id="viewerAllBoxesBtn">🔗 see all boxes</button>
+        <button class="small ghost" id="viewerNewBoxBtn">🎁 make your own box</button>
+      </div>
     </div>
     <div class="viewer-slide-area" id="viewerSlideArea"></div>
     <div class="viewer-nav">
@@ -703,15 +705,6 @@
         }
       }, 500);
     }
-  });
-
-  document.getElementById('allGiftsLink').addEventListener('click', function(e){
-    e.preventDefault();
-    boxOuter.classList.add('untied', 'lid-open');
-    boxScreen.style.display = 'none';
-    app.classList.add('show');
-    var galleryBtn = document.querySelector('nav.tabs button[data-tab="gallery"]');
-    if(galleryBtn) galleryBtn.click();
   });
 
   /* ---------------- TABS ---------------- */
@@ -1958,6 +1951,14 @@
     history.replaceState(null, '', location.pathname + location.search);
     app.classList.add('show');
   });
+  document.getElementById('viewerAllBoxesBtn').addEventListener('click', function(){
+    viewerScreen.classList.remove('show');
+    setTimeout(function(){ viewerScreen.style.display = 'none'; }, 400);
+    history.replaceState(null, '', location.pathname + location.search);
+    app.classList.add('show');
+    var galleryBtn = document.querySelector('nav.tabs button[data-tab="gallery"]');
+    if(galleryBtn) galleryBtn.click();
+  });
 
   document.getElementById('buildBoxBtn').addEventListener('click', function(){
     playSealStamp();
@@ -2003,9 +2004,11 @@
 
   // auto-load a shared box from the URL hash, e.g. #box=b12345 — reveal it through the
   // same ribbon/lid ceremony as any other box, instead of skipping straight to the carousel.
+  // With no hash at all, the home page defaults to this box so the plain root link works too.
+  var DEFAULT_BOX_ID = 'b178919471187274';
   (function(){
     var m = location.hash.match(/box=([a-zA-Z0-9]+)/);
-    if(m){ loadBoxById(m[1], true); }
+    loadBoxById(m ? m[1] : DEFAULT_BOX_ID, true);
   })();
 
   refreshGallery();
