@@ -753,17 +753,19 @@
   var letterCount = 0;
   var letters = []; // {id, card, textarea, canvas, ctx, sealIndex}
   var SEALS = [
-    { sym:'✦', color:'#7A2E2E' },
-    { sym:'♥', color:'#B23A48' },
-    { sym:'✿', color:'#6B8F71' },
-    { sym:'M', color:'#C08A3E' },
-    { sym:'❧', color:'#2B2420' }
+    { icon:'star', color:'#7A2E2E' },
+    { icon:'heart', color:'#B23A48' },
+    { icon:'flower', color:'#6B8F71' },
+    { icon:'sun', color:'#C08A3E' },
+    { icon:'sprig', color:'#2B2420' }
   ];
   var PEN_COLORS = ['#2B2420','#7A2E2E','#3a5a6b'];
 
-  /* ---------------- WAX SEAL (algorithmically drawn, not an emoji) ---------------- */
+  /* ---------------- WAX SEAL (algorithmically drawn art, not an emoji glyph) ---------------- */
   // A deterministic "blob" outline (seeded pseudo-random radii through a Catmull-Rom
-  // spline) so each seal looks like real dripped wax instead of a perfect circle.
+  // spline) so each seal looks like real dripped wax instead of a perfect circle, and
+  // the stamped motif itself is procedurally generated geometry (star points, petals
+  // rotated around a center, sunburst rays, a leafy sprig) instead of a text character.
   function sealSeededRandom(seed){ var x = Math.sin(seed) * 10000; return x - Math.floor(x); }
   function sealBlobPath(seed){
     var points = 11, cx = 50, cy = 52, baseR = 42, irregularity = 0.11;
@@ -787,13 +789,66 @@
     var R = f >> 16, G = (f >> 8) & 0x00FF, B = f & 0x0000FF;
     return '#' + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
   }
+  function sealStarPath(cx, cy, outerR, innerR, points){
+    var d = '', step = Math.PI / points;
+    for(var i = 0; i < points * 2; i++){
+      var r = i % 2 === 0 ? outerR : innerR;
+      var angle = i * step - Math.PI / 2;
+      var x = cx + Math.cos(angle) * r, y = cy + Math.sin(angle) * r;
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d + 'Z';
+  }
+  function sealHeartPath(cx, cy){
+    return 'M' + cx + ',' + (cy + 20) +
+      ' C' + (cx - 30) + ',' + (cy - 2) + ' ' + (cx - 30) + ',' + (cy - 26) + ' ' + (cx - 14) + ',' + (cy - 26) +
+      ' C' + (cx - 7) + ',' + (cy - 26) + ' ' + cx + ',' + (cy - 21) + ' ' + cx + ',' + (cy - 16) +
+      ' C' + cx + ',' + (cy - 21) + ' ' + (cx + 7) + ',' + (cy - 26) + ' ' + (cx + 14) + ',' + (cy - 26) +
+      ' C' + (cx + 30) + ',' + (cy - 26) + ' ' + (cx + 30) + ',' + (cy - 2) + ' ' + cx + ',' + (cy + 20) + ' Z';
+  }
+  var SEAL_ICONS = {
+    star: function(){ return '<path d="' + sealStarPath(50, 52, 27, 12, 5) + '"/>'; },
+    heart: function(){ return '<path d="' + sealHeartPath(50, 53) + '"/>'; },
+    flower: function(){
+      var cx = 50, cy = 52, petals = 6, petalLen = 32, petalW = 9, g = '';
+      for(var i = 0; i < petals; i++){
+        var angle = i * (360 / petals);
+        g += '<ellipse cx="' + cx + '" cy="' + (cy - petalLen / 2) + '" rx="' + petalW + '" ry="' + (petalLen / 2) + '" transform="rotate(' + angle + ' ' + cx + ' ' + cy + ')"/>';
+      }
+      g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (petalW * 0.85) + '"/>';
+      return g;
+    },
+    sun: function(){
+      var cx = 50, cy = 52, rays = 8, innerR = 9, outerR = 28, halfW = (18 * Math.PI / 180) / 2, g = '<circle cx="' + cx + '" cy="' + cy + '" r="' + innerR + '"/>';
+      for(var i = 0; i < rays; i++){
+        var angle = i * (Math.PI * 2 / rays) - Math.PI / 2;
+        var x1 = cx + Math.cos(angle - halfW) * innerR, y1 = cy + Math.sin(angle - halfW) * innerR;
+        var x2 = cx + Math.cos(angle) * outerR, y2 = cy + Math.sin(angle) * outerR;
+        var x3 = cx + Math.cos(angle + halfW) * innerR, y3 = cy + Math.sin(angle + halfW) * innerR;
+        g += '<path d="M' + x1.toFixed(1) + ',' + y1.toFixed(1) + ' L' + x2.toFixed(1) + ',' + y2.toFixed(1) + ' L' + x3.toFixed(1) + ',' + y3.toFixed(1) + ' Z"/>';
+      }
+      return g;
+    },
+    sprig: function(){
+      var cx = 50, cy = 52, length = 46, leaves = 4, leafLen = 20, leafW = 9;
+      var g = '<path d="M' + (cx - 1.4) + ',' + (cy + length / 2) + ' L' + (cx + 1.4) + ',' + (cy + length / 2) + ' L' + (cx + 1.4) + ',' + (cy - length / 2) + ' L' + (cx - 1.4) + ',' + (cy - length / 2) + ' Z"/>';
+      for(var i = 0; i < leaves; i++){
+        var t = (i + 1) / (leaves + 1);
+        var y = cy + length / 2 - t * length;
+        var side = i % 2 === 0 ? 1 : -1;
+        var lx = cx + side * leafW * 0.95;
+        g += '<ellipse cx="' + lx.toFixed(1) + '" cy="' + y.toFixed(1) + '" rx="' + (leafLen / 2) + '" ry="' + (leafW / 2) + '" transform="rotate(' + (side * 35) + ' ' + lx.toFixed(1) + ' ' + y.toFixed(1) + ')"/>';
+      }
+      return g;
+    }
+  };
   var SEAL_BLOB_CACHE = {};
-  function waxSealSVG(color, symbol, seed, fontSize){
+  function waxSealSVG(color, iconKey, seed){
     if(!(seed in SEAL_BLOB_CACHE)) SEAL_BLOB_CACHE[seed] = sealBlobPath(seed);
     var path = SEAL_BLOB_CACHE[seed];
     var light = sealShade(color, 32), dark = sealShade(color, -38);
     var uid = 'waxg' + seed;
-    fontSize = fontSize || 32;
+    var icon = (SEAL_ICONS[iconKey] || SEAL_ICONS.star)();
     return '<svg viewBox="0 0 100 104" width="100%" height="100%" style="overflow:visible;">' +
       '<defs><radialGradient id="' + uid + '" cx="36%" cy="28%" r="80%">' +
         '<stop offset="0%" stop-color="' + light + '"/>' +
@@ -802,9 +857,9 @@
       '</radialGradient></defs>' +
       '<path d="' + path + '" fill="url(#' + uid + ')" stroke="' + dark + '" stroke-width="1"/>' +
       '<ellipse cx="37" cy="29" rx="15" ry="9" fill="#fff" opacity="0.2"/>' +
-      '<text x="51" y="61" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + fontSize + '" fill="' + dark + '" opacity="0.6">' + symbol + '</text>' +
-      '<text x="49" y="59" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + fontSize + '" fill="' + light + '" opacity="0.55">' + symbol + '</text>' +
-      '<text x="50" y="60" text-anchor="middle" font-family="Fraunces, serif" font-weight="600" font-size="' + (fontSize - 2) + '" fill="' + color + '">' + symbol + '</text>' +
+      '<g transform="translate(1,1)" fill="' + dark + '" opacity="0.6">' + icon + '</g>' +
+      '<g transform="translate(-1,-1)" fill="' + light + '" opacity="0.5">' + icon + '</g>' +
+      '<g fill="' + color + '">' + icon + '</g>' +
     '</svg>';
   }
 
@@ -826,14 +881,14 @@
       '<canvas class="letter-canvas" width="300" height="270"></canvas>' +
       '<div class="flap flap-top"></div>' +
       '<div class="flap flap-bottom"></div>' +
-      '<div class="seal">' + waxSealSVG(SEALS[0].color, SEALS[0].sym, 0) + '</div>' +
+      '<div class="seal">' + waxSealSVG(SEALS[0].color, SEALS[0].icon, 0) + '</div>' +
       '<div class="envelope-sticker-layer"></div>';
     container.appendChild(card);
 
     var btn = document.createElement('div');
     btn.className = 'letter-controls';
     var sealSwatches = SEALS.map(function(s,i){
-      return '<div class="seal-swatch' + (i===0?' active':'') + '" data-i="'+i+'">' + waxSealSVG(s.color, s.sym, i, 22) + '</div>';
+      return '<div class="seal-swatch' + (i===0?' active':'') + '" data-i="'+i+'">' + waxSealSVG(s.color, s.icon, i) + '</div>';
     }).join('');
     btn.innerHTML = '<button class="small ghost fold-btn">Fold &amp; seal ✉️</button><div class="seal-picker">'+sealSwatches+'</div>' +
       '<div class="unlock-row">🔒 seal until <input type="date" class="unlock-date"></div>' +
@@ -888,7 +943,7 @@
         var i = +sw.dataset.i;
         var s = SEALS[i];
         var sealEl = card.querySelector('.seal');
-        sealEl.innerHTML = waxSealSVG(s.color, s.sym, i);
+        sealEl.innerHTML = waxSealSVG(s.color, s.icon, i);
         rec.sealIndex = i;
       });
     });
@@ -1871,7 +1926,7 @@
         scene.innerHTML =
           '<div class="viewer-letter-paper"></div>' +
           '<div class="viewer-envelope-cover">' +
-            '<div class="viewer-seal">' + waxSealSVG(seal.color, seal.sym, sealIndex) + '</div>' +
+            '<div class="viewer-seal">' + waxSealSVG(seal.color, seal.icon, sealIndex) + '</div>' +
             '<div class="viewer-envelope-stickers"></div>' +
           '</div>';
         container.appendChild(scene);
