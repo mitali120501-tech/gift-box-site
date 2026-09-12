@@ -500,13 +500,14 @@
   .viewer-cassette-mixtape .track-row.unplayable .title{ opacity:.45; text-decoration:line-through; }
   .viewer-cassette-mixtape .track-row .title{ font-size:14px; }
   /* ---- fully-simulated cassette deck ---- */
-  .tape-deck{ width:300px; margin:0 auto 14px; background:linear-gradient(180deg,#4a423a,#2e2822); border-radius:12px; padding:14px; box-shadow:0 10px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); }
+  .tape-deck{ width:360px; margin:0 auto 14px; background:linear-gradient(180deg,#4a423a,#2e2822); border-radius:12px; padding:14px; box-shadow:0 10px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); }
   .deck-window{ position:relative; background:#0d0b09; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,.7); overflow:hidden; }
   .tape-canvas{ display:block; width:100%; height:auto; cursor:pointer; }
+  .yt-host{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none; }
   .deck-readout{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:12px; }
   .tape-counter{ background:#111; border-radius:4px; padding:4px 8px; font-family:'Press Start 2P', monospace; font-size:12px; color:#e8d9a8; letter-spacing:2px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
-  .vu-meters{ display:flex; gap:4px; align-items:flex-end; height:22px; background:#111; border-radius:4px; padding:3px 5px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
-  .vu-bar{ width:6px; height:4%; border-radius:1px; background:linear-gradient(0deg,#6B8F71,#D9A441 70%,#B23A48 92%); transition:height .08s linear; }
+  .vu-meters{ display:flex; gap:4px; align-items:flex-end; height:26px; background:#111; border-radius:4px; padding:3px 5px; box-shadow:inset 0 2px 4px rgba(0,0,0,.6); }
+  .vu-bar{ width:6px; height:14%; border-radius:1px; background:linear-gradient(0deg,#6B8F71,#D9A441 70%,#B23A48 92%); transition:height .08s linear; }
   .deck-controls{ display:flex; justify-content:center; gap:6px; margin-top:12px; flex-wrap:wrap; }
   .deck-btn{ width:38px; height:32px; border-radius:5px; border:none; background:linear-gradient(180deg,#5a5049,#332c26); color:#e8d9a8; font-size:15px; box-shadow:0 3px 0 #1c1713, 0 4px 6px rgba(0,0,0,.4); cursor:pointer; transition:transform .1s, box-shadow .1s; }
   .deck-btn:active, .deck-btn.pressed{ transform:translateY(3px); box-shadow:0 0 0 #1c1713, 0 1px 2px rgba(0,0,0,.4); }
@@ -1288,10 +1289,11 @@
   function renderVaseScene(stems, target){
     target = target || vaseScene;
     var W = 320, H = 340, DPR = Math.min(window.devicePixelRatio || 1, 2);
-    var vaseTopY = H - 140;
+    var vaseTopY = H - 150;
     var vaseX = W / 2;
-    var tieX = vaseX, tieY = vaseTopY + 22;
-    var waterY = vaseTopY + 52;
+    var tieX = vaseX, tieY = vaseTopY + 16;    // the tie sits in the mouth of the vase
+    var waterY = vaseTopY + 26;
+    var vaseFloorY = vaseTopY + 126;
     var n = stems.length;
 
     target.innerHTML = '';
@@ -1332,8 +1334,13 @@
       }
       var img = new Image();
       img.src = s.img;
+      // the cut end carries on past the tie, down into the water where you can see
+      // it through the glass — without this the stems just stop in mid-air
+      var spreadAtFloor = spread * 20 + (sealSeededRandom(i * 2.4) - 0.5) * 12;
       return {
         data: s, rest: rest, pts: pts, prev: prev, segLen: segLen,
+        tail: [[tieX, tieY], [tieX + spreadAtFloor * 0.5, (tieY + vaseFloorY) / 2],
+               [tieX + spreadAtFloor, vaseFloorY - 4]],
         img: img, phase: sealSeededRandom(i * 3.3) * Math.PI * 2,
         gust: 0.6 + sealSeededRandom(i * 5.1) * 0.9,
         headR: 27 - Math.min(7, n),
@@ -1547,57 +1554,97 @@
       ctx.restore();
       ctx.restore();
     }
+    var VW = 46, VB = 20;                     // half-width at the rim, and at the foot
     function vaseOutline(){
       ctx.beginPath();
-      ctx.moveTo(vaseX - 40, vaseTopY);
-      ctx.lineTo(vaseX + 40, vaseTopY);
-      ctx.bezierCurveTo(vaseX + 52, vaseTopY + 40, vaseX + 46, vaseTopY + 118, vaseX + 12, vaseTopY + 122);
-      ctx.lineTo(vaseX - 12, vaseTopY + 122);
-      ctx.bezierCurveTo(vaseX - 46, vaseTopY + 118, vaseX - 52, vaseTopY + 40, vaseX - 40, vaseTopY);
+      ctx.moveTo(vaseX - VW, vaseTopY);
+      ctx.bezierCurveTo(vaseX - 58, vaseTopY + 48, vaseX - 50, vaseFloorY - 10, vaseX - VB, vaseFloorY);
+      ctx.lineTo(vaseX + VB, vaseFloorY);
+      ctx.bezierCurveTo(vaseX + 50, vaseFloorY - 10, vaseX + 58, vaseTopY + 48, vaseX + VW, vaseTopY);
       ctx.closePath();
+    }
+    // the cut stems standing in the water, seen through the glass: shifted and
+    // swollen a little, because that is what water does to anything behind it
+    function drawSubmerged(){
+      ctx.save();
+      vaseOutline(); ctx.clip();
+      ctx.beginPath(); ctx.rect(vaseX - 64, waterY, 128, 260); ctx.clip();
+      ctx.translate(vaseX, 0); ctx.scale(1.07, 1); ctx.translate(-vaseX, 0);
+      ropes.forEach(function(rp){
+        var tl = rp.tail;
+        ctx.beginPath();
+        ctx.moveTo(tl[0][0], tl[0][1]);
+        ctx.quadraticCurveTo(tl[1][0], tl[1][1], tl[2][0], tl[2][1]);
+        ctx.strokeStyle = 'rgba(74,102,68,.75)'; ctx.lineWidth = 3.2; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+      ctx.restore();
     }
     function drawVase(){
       ctx.save();
       vaseOutline();
       ctx.save(); ctx.clip();
-      var wg = ctx.createLinearGradient(vaseX - 52, 0, vaseX + 52, 0);
-      wg.addColorStop(0, 'rgba(150,185,180,.34)');
-      wg.addColorStop(0.45, 'rgba(120,160,158,.22)');
-      wg.addColorStop(1, 'rgba(90,120,120,.34)');
+
+      // water body
+      var wg = ctx.createLinearGradient(vaseX - 58, 0, vaseX + 58, 0);
+      wg.addColorStop(0, 'rgba(132,176,172,.55)');
+      wg.addColorStop(0.42, 'rgba(176,212,206,.34)');
+      wg.addColorStop(1, 'rgba(86,120,120,.55)');
       ctx.fillStyle = wg;
-      ctx.fillRect(vaseX - 60, waterY, 120, 200);
-      ctx.fillStyle = 'rgba(255,255,255,.45)';
-      ctx.fillRect(vaseX - 60, waterY - 1.5, 120, 2);
+      ctx.fillRect(vaseX - 64, waterY, 128, 260);
+      // the meniscus: bright line with a shadow just under it
+      ctx.fillStyle = 'rgba(255,255,255,.72)';
+      ctx.fillRect(vaseX - 64, waterY - 1.5, 128, 2.2);
+      ctx.fillStyle = 'rgba(60,95,95,.22)';
+      ctx.fillRect(vaseX - 64, waterY + 0.7, 128, 3);
+
       bubbles.forEach(function(bb){
         ctx.beginPath(); ctx.arc(bb.x, bb.y, bb.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(236,248,247,.30)'; ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.7; ctx.stroke();
+        ctx.fillStyle = 'rgba(236,248,247,.32)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.7; ctx.stroke();
         ctx.beginPath();
         ctx.arc(bb.x - bb.r * 0.32, bb.y - bb.r * 0.34, Math.max(0.4, bb.r * 0.3), 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill();
       });
       ctx.restore();
-      var g = ctx.createLinearGradient(vaseX - 52, 0, vaseX + 52, 0);
-      g.addColorStop(0, 'rgba(215,225,225,.42)');
-      g.addColorStop(0.3, 'rgba(240,248,248,.16)');
-      g.addColorStop(0.72, 'rgba(140,160,165,.20)');
-      g.addColorStop(1, 'rgba(200,215,215,.40)');
+
+      // the glass itself. A flat cool tint over the whole vessel first — without
+      // it the dry glass above the waterline vanishes into the warm paper and the
+      // rim reads as a saucer floating on its own.
+      ctx.fillStyle = 'rgba(196,220,218,.34)';
+      ctx.fill();
+      // then dark at the edges where you look through more of it, clear down the
+      // middle, with a hard specular stripe on the left
+      var g = ctx.createLinearGradient(vaseX - VW - 12, 0, vaseX + VW + 12, 0);
+      g.addColorStop(0,    'rgba(120,146,146,.78)');
+      g.addColorStop(0.13, 'rgba(236,246,244,.50)');
+      g.addColorStop(0.34, 'rgba(255,255,255,.10)');
+      g.addColorStop(0.62, 'rgba(150,175,175,.10)');
+      g.addColorStop(0.88, 'rgba(120,146,148,.42)');
+      g.addColorStop(1,    'rgba(92,118,120,.8)');
       ctx.fillStyle = g; ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.fillRect(vaseX - 34, vaseTopY + 12, 5, (vaseFloorY - vaseTopY) * 0.62);
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.fillRect(vaseX + 26, vaseTopY + 26, 3, (vaseFloorY - vaseTopY) * 0.4);
       ctx.restore();
-    }
-    // the submerged part of each stem, redrawn shifted and tinted so the glass
-    // and water visibly bend it — the giveaway that there is water in there
-    function drawRefracted(){
-      ctx.save();
-      vaseOutline(); ctx.clip();
-      ctx.beginPath(); ctx.rect(vaseX - 60, waterY, 120, 200); ctx.clip();
-      ctx.translate(vaseX, 0); ctx.scale(1.06, 1); ctx.translate(-vaseX, 0);
-      ctx.globalAlpha = 0.5;
-      ropes.forEach(function(rp){
-        ctx.strokeStyle = '#4f6d48'; ctx.lineWidth = 3.6; strokeStem(rp);
-      });
-      ctx.globalAlpha = 1;
+
+      // a cool dark edge so the glass has a silhouette against the paper,
+      // then the white highlight just inside it
+      ctx.strokeStyle = 'rgba(92,116,116,.55)'; ctx.lineWidth = 2.2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1; ctx.stroke();
+
+      // rim seen in perspective, and the shadow the vase sits in
+      ctx.beginPath();
+      ctx.ellipse(vaseX, vaseTopY, VW, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(206,224,222,.4)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(104,130,130,.55)'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(vaseX, vaseFloorY + 3, VB + 16, 5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(90,72,48,.22)'; ctx.fill();
       ctx.restore();
     }
 
@@ -1618,16 +1665,25 @@
       // the tie: twine wound round where the stems cross
       ctx.save();
       ctx.translate(tieX, tieY);
-      ctx.fillStyle = '#C08A3E';
-      ctx.beginPath(); ctx.ellipse(0, 0, 19, 10, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 1;
-      for(var i = -12; i <= 12; i += 6){
-        ctx.beginPath(); ctx.moveTo(i, -9); ctx.lineTo(i + 3, 9); ctx.stroke();
+      // twine wound round the crossing point, not a bead
+      ctx.fillStyle = '#b98a4c';
+      ctx.beginPath(); ctx.moveTo(-16, -9); ctx.lineTo(16, -9);
+      ctx.quadraticCurveTo(19, 0, 16, 9); ctx.lineTo(-16, 9);
+      ctx.quadraticCurveTo(-19, 0, -16, -9); ctx.closePath(); ctx.fill();
+      ctx.lineCap = 'round';
+      for(var i = -14; i <= 12; i += 5){
+        ctx.strokeStyle = 'rgba(120,84,38,.65)'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(i, -9); ctx.lineTo(i + 4, 9); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,228,178,.5)'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(i + 1.6, -9); ctx.lineTo(i + 5.6, 9); ctx.stroke();
       }
+      ctx.strokeStyle = 'rgba(70,48,20,.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-16, -9); ctx.lineTo(16, -9); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-16, 9); ctx.lineTo(16, 9); ctx.stroke();
       ctx.restore();
 
       ropes.forEach(drawHead);
-      drawRefracted();
+      drawSubmerged();
       drawVase();
 
       petals.forEach(function(pt){
@@ -2388,6 +2444,23 @@
   var viewerSlides = [];
   var viewerIndex = 0;
 
+  /* The YouTube player API, loaded once and only if a box actually contains a
+     video. Anything queued before it arrives runs as soon as it does. */
+  var ytQueue = [], ytState = 'idle';
+  function ytReady(fn){
+    if(ytState === 'ready'){ fn(); return; }
+    ytQueue.push(fn);
+    if(ytState !== 'idle') return;
+    ytState = 'loading';
+    window.onYouTubeIframeAPIReady = function(){
+      ytState = 'ready';
+      ytQueue.splice(0).forEach(function(f){ try{ f(); }catch(e){} });
+    };
+    var tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  }
+
   function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function buildViewerSlides(state){
@@ -2511,20 +2584,41 @@
             if(aperture > Math.hypot(CX, CY) + 6) return;   // fully open: nothing left to draw
             var cs = bladeCentres(t);
 
-            // blade material fills the frame, then the opening is cut out of it, then
-            // each blade is laid back over the material so their edges cross visibly
-            g.fillStyle = '#8a6f4a';
+            // Backing first, in the blade colour: any sliver between two leaves lands
+            // on the same tone, so the leaves can be honest shapes without leaking.
+            g.fillStyle = '#7d6442';
             g.fillRect(0, 0, W, H);
 
+            // Each leaf is its true shape — the arc that forms the opening, swept out
+            // to beyond the frame — so their edges cross like a real diaphragm's.
+            var DELTA = 1.22, FAR = 430;
             for(var i = 0; i < N; i++){
               var b = cs[i];
+              var phi = Math.atan2(CY - b[1], CX - b[0]);      // from the leaf toward the middle
+              var pts = [], s2, ang;
+              for(s2 = 0; s2 <= 18; s2++){
+                ang = phi - DELTA + (2 * DELTA) * (s2 / 18);
+                pts.push([b[0] + Math.cos(ang) * RA, b[1] + Math.sin(ang) * RA]);
+              }
+              var last = pts[pts.length - 1], first = pts[0];
+              var bl = Math.atan2(last[1] - CY, last[0] - CX);
+              var bf = Math.atan2(first[1] - CY, first[0] - CX);
+              g.beginPath();
+              g.moveTo(pts[0][0], pts[0][1]);
+              for(s2 = 1; s2 < pts.length; s2++) g.lineTo(pts[s2][0], pts[s2][1]);
+              g.lineTo(CX + Math.cos(bl) * FAR, CY + Math.sin(bl) * FAR);
+              g.lineTo(CX + Math.cos(bf) * FAR, CY + Math.sin(bf) * FAR);
+              g.closePath();
               var grad = g.createLinearGradient(b[0] - RA, b[1] - RA, b[0] + RA, b[1] + RA);
-              grad.addColorStop(0, '#a98a5f');
-              grad.addColorStop(0.5, i % 2 ? '#8e7149' : '#96784f');
-              grad.addColorStop(1, '#6f5836');
-              g.fillStyle = grad;
-              g.beginPath(); g.arc(b[0], b[1], RA, 0, Math.PI*2); g.fill();
-              g.strokeStyle = 'rgba(255,236,200,.20)'; g.lineWidth = 1; g.stroke();
+              grad.addColorStop(0, i % 2 ? '#b0906a' : '#a5875f');
+              grad.addColorStop(0.55, i % 2 ? '#8e7149' : '#977a50');
+              grad.addColorStop(1, '#6b5433');
+              g.fillStyle = grad; g.fill();
+              // the lit edge along the leaf's working rim
+              g.beginPath();
+              g.moveTo(pts[0][0], pts[0][1]);
+              for(s2 = 1; s2 < pts.length; s2++) g.lineTo(pts[s2][0], pts[s2][1]);
+              g.strokeStyle = 'rgba(255,238,205,.34)'; g.lineWidth = 1.2; g.stroke();
             }
 
             g.globalCompositeOperation = 'destination-out';
@@ -2599,7 +2693,7 @@
           '</div>' +
           '<div class="viewer-cassette-view">' +
             '<div class="tape-deck">' +
-              '<div class="deck-window"><canvas class="tape-canvas" width="520" height="300"></canvas></div>' +
+              '<div class="deck-window"><canvas class="tape-canvas" width="660" height="420"></canvas></div>' +
               '<div class="deck-readout">' +
                 '<div class="tape-counter">00:00</div>' +
                 '<div class="vu-meters"><div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div></div>' +
@@ -2644,11 +2738,11 @@
            during fast-wind, the way a real deck lifts its heads off the tape.          */
         var transport = (function(){
           var ctx = tapeCanvas.getContext('2d');
-          var W = 260, H = 150, SCALE = 2;             // logical units, backing store is 2x
-          var HUB_L = { x: 90, y: 48 }, HUB_R = { x: 170, y: 48 };
-          var R_HUB = 11, R_FULL = 33;
-          var GUIDE_L = { x: 62, y: 124 }, GUIDE_R = { x: 198, y: 124 };
-          var HEAD_Y = 126;
+          var W = 330, H = 210, SCALE = 2;             // logical units, backing store is 2x
+          var HUB_L = { x: 112, y: 66 }, HUB_R = { x: 218, y: 66 };
+          var R_HUB = 14, R_FULL = 43;
+          var GUIDE_L = { x: 78, y: 162 }, GUIDE_R = { x: 252, y: 162 };
+          var HEAD_Y = 166;
 
           var st = {
             progress: 0,        // 0..1 through the tape
@@ -2717,69 +2811,74 @@
             var g = ctx.createLinearGradient(0, 4, 0, H-4);
             g.addColorStop(0, '#d8b788'); g.addColorStop(0.5, '#c09a68'); g.addColorStop(1, '#9d7b4f');
             ctx.fillStyle = g;
-            roundRect(4, 6, W-8, 136, 7); ctx.fill();
+            roundRect(6, 8, W-12, 188, 8); ctx.fill();
             ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
 
             // screws
             ctx.fillStyle = '#6f5636';
-            [[14,18],[246,18],[14,130],[246,130]].forEach(function(p){
-              ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI*2); ctx.fill();
+            [[20,24],[310,24],[20,182],[310,182]].forEach(function(p){
+              ctx.beginPath(); ctx.arc(p[0], p[1], 3.4, 0, Math.PI*2); ctx.fill();
             });
 
             // ---- clear window
             ctx.save();
-            roundRect(50, 12, 160, 74, 5);
-            ctx.fillStyle = 'rgba(20,16,12,.82)'; ctx.fill();
+            roundRect(60, 16, 210, 104, 6);
+            ctx.fillStyle = 'rgba(24,19,14,.72)'; ctx.fill();
             ctx.clip();
 
             var rl = packRadius(1 - st.progress), rr = packRadius(st.progress);
 
-            // wound tape packs, with a faint spiral so rotation reads on the pack itself
+            // wound tape packs: lit from the top left, with a spiral wound from the
+            // hub out to the current radius so the rotation reads on the pack itself
             [[HUB_L, rl, st.angleL], [HUB_R, rr, st.angleR]].forEach(function(p){
               var c = p[0], r = p[1], ang = p[2];
-              var pg = ctx.createRadialGradient(c.x - r*0.3, c.y - r*0.3, r*0.2, c.x, c.y, r);
-              pg.addColorStop(0, '#6b5436'); pg.addColorStop(1, '#3a2c1b');
+              var pg = ctx.createRadialGradient(c.x - r*0.35, c.y - r*0.4, r*0.15, c.x, c.y, r);
+              pg.addColorStop(0, '#8e7048'); pg.addColorStop(0.7, '#6a5232'); pg.addColorStop(1, '#3f301d');
               ctx.fillStyle = pg;
               ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI*2); ctx.fill();
               ctx.save();
               ctx.translate(c.x, c.y); ctx.rotate(ang);
-              ctx.strokeStyle = 'rgba(255,225,170,.10)'; ctx.lineWidth = 0.7;
+              ctx.strokeStyle = 'rgba(255,226,176,.20)'; ctx.lineWidth = 0.8;
               ctx.beginPath();
-              for(var a = 0; a < Math.PI*6; a += 0.15){
-                var rr2 = R_HUB + (r - R_HUB) * (a / (Math.PI*6));
+              for(var a = 0; a < Math.PI*8; a += 0.12){
+                var rr2 = R_HUB + (r - R_HUB) * (a / (Math.PI*8));
                 var x = Math.cos(a)*rr2, y = Math.sin(a)*rr2;
                 if(a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
               }
               ctx.stroke();
               ctx.restore();
+              ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI*2); ctx.stroke();
             });
             ctx.restore();
 
             // ---- mouth: the opening along the bottom that the heads rise into
-            ctx.fillStyle = '#120f0c';
-            roundRect(54, 110, 152, 32, 2); ctx.fill();
+            ctx.fillStyle = '#15110d';
+            roundRect(66, 148, 198, 48, 3); ctx.fill();
 
             // ---- the tape ribbon: true tangents off each pack, round the guides,
             //      bowed forward across the head face when the heads are engaged
             var tl = tangentPoint(HUB_L, rl, GUIDE_L, 1);
             var tr = tangentPoint(HUB_R, rr, GUIDE_R, -1);
-            var bow = st.engaged ? 3.5 : 0;
+            var bow = st.engaged ? 5 : 0;
 
             function ribbonPath(){
               ctx.beginPath();
               ctx.moveTo(tl.x, tl.y);
-              ctx.arcTo(GUIDE_L.x, GUIDE_L.y, GUIDE_R.x, GUIDE_R.y, 7);
-              ctx.lineTo(118, HEAD_Y + bow);
-              ctx.quadraticCurveTo(145, HEAD_Y + bow*1.6, 172, HEAD_Y + bow);
-              ctx.arcTo(GUIDE_R.x, GUIDE_R.y, tr.x, tr.y, 7);
+              ctx.arcTo(GUIDE_L.x, GUIDE_L.y, GUIDE_R.x, GUIDE_R.y, 9);
+              ctx.lineTo(150, HEAD_Y + bow);
+              ctx.quadraticCurveTo(186, HEAD_Y + bow*1.7, 222, HEAD_Y + bow);
+              ctx.arcTo(GUIDE_R.x, GUIDE_R.y, tr.x, tr.y, 9);
               ctx.lineTo(tr.x, tr.y);
             }
             ctx.lineCap = 'butt';
             ribbonPath();
-            ctx.strokeStyle = '#2a2015'; ctx.lineWidth = 3.4; ctx.stroke();
+            ctx.strokeStyle = '#241a10'; ctx.lineWidth = 5; ctx.stroke();
             ribbonPath();
-            ctx.strokeStyle = 'rgba(196,158,96,.55)'; ctx.lineWidth = 1;
-            ctx.setLineDash([6, 9]); ctx.lineDashOffset = st.ribbonPhase;
+            ctx.strokeStyle = 'rgba(150,116,66,.9)'; ctx.lineWidth = 3.4; ctx.stroke();
+            ribbonPath();
+            ctx.strokeStyle = 'rgba(255,222,168,.85)'; ctx.lineWidth = 1.1;
+            ctx.setLineDash([7, 11]); ctx.lineDashOffset = st.ribbonPhase;
             ctx.stroke();
             ctx.setLineDash([]);
 
@@ -2789,23 +2888,25 @@
 
             // ---- guide rollers
             [GUIDE_L, GUIDE_R].forEach(function(gp){
-              ctx.fillStyle = '#3d332a';
-              ctx.beginPath(); ctx.arc(gp.x, gp.y, 5, 0, Math.PI*2); ctx.fill();
-              ctx.fillStyle = '#8d7a5f';
-              ctx.beginPath(); ctx.arc(gp.x, gp.y, 2, 0, Math.PI*2); ctx.fill();
+              ctx.fillStyle = '#4a3f33';
+              ctx.beginPath(); ctx.arc(gp.x, gp.y, 7, 0, Math.PI*2); ctx.fill();
+              ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 1; ctx.stroke();
+              ctx.fillStyle = '#a08c6d';
+              ctx.beginPath(); ctx.arc(gp.x, gp.y, 2.6, 0, Math.PI*2); ctx.fill();
             });
 
             // ---- label, sitting on the shell face above the tape run
             ctx.fillStyle = '#f6efdd';
-            roundRect(64, 90, 132, 17, 2); ctx.fill();
+            roundRect(72, 124, 186, 20, 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1; ctx.stroke();
             ctx.fillStyle = '#7A2E2E';
-            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.font = '7px "Press Start 2P", monospace';
             ctx.textBaseline = 'middle';
-            ctx.fillText('A', 69, 99);
+            ctx.fillText('A', 79, 134);
             ctx.textAlign = 'center';
-            var lbl = st.label.length > 17 ? st.label.slice(0, 16) + '…' : st.label;
+            var lbl = st.label.length > 22 ? st.label.slice(0, 21) + '…' : st.label;
             ctx.fillStyle = '#2B2420';
-            ctx.fillText(lbl, 133, 99);
+            ctx.fillText(lbl, 168, 134);
             ctx.textAlign = 'left';
 
             ctx.restore();
@@ -2814,22 +2915,26 @@
             ctx.save();
             ctx.translate(0, st.headOffset);
             ctx.fillStyle = '#2a2622';
-            roundRect(74, 142, 112, 10, 3); ctx.fill();
+            roundRect(96, 190, 150, 12, 3); ctx.fill();
             // erase head
-            ctx.fillStyle = '#5c5650'; roundRect(88, 122, 13, 22, 2); ctx.fill();
+            ctx.fillStyle = '#5c5650'; roundRect(118, 158, 17, 34, 2); ctx.fill();
+            ctx.fillStyle = '#3b3631'; ctx.fillRect(125, 158, 1.6, 34);
             // record / playback head, with its gap
-            var hg = ctx.createLinearGradient(117, 0, 142, 0);
-            hg.addColorStop(0, '#6e665d'); hg.addColorStop(0.5, '#9a9188'); hg.addColorStop(1, '#5d564e');
-            ctx.fillStyle = hg; roundRect(117, 116, 25, 28, 2); ctx.fill();
-            ctx.fillStyle = '#241f1a'; ctx.fillRect(129, 116, 1.6, 28);
+            var hg = ctx.createLinearGradient(156, 0, 190, 0);
+            hg.addColorStop(0, '#6e665d'); hg.addColorStop(0.5, '#a79e94'); hg.addColorStop(1, '#5d564e');
+            ctx.fillStyle = hg; roundRect(156, 150, 34, 42, 2); ctx.fill();
+            ctx.fillStyle = '#241f1a'; ctx.fillRect(172, 150, 2, 42);
             // pinch roller pressing the tape against the spinning capstan
             ctx.fillStyle = '#1d1a17';
-            ctx.beginPath(); ctx.arc(171, 128, 9, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1;
-            ctx.save(); ctx.translate(171, 128); ctx.rotate(st.angleR * 1.6);
-            ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.stroke(); ctx.restore();
-            ctx.fillStyle = '#b9b2a6';
-            ctx.beginPath(); ctx.arc(181, 128, 4.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(226, 170, 12, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1.2;
+            ctx.save(); ctx.translate(226, 170); ctx.rotate(st.angleR * 1.6);
+            ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 12); ctx.stroke();
+            ctx.restore();
+            ctx.fillStyle = '#c3bcb0';
+            ctx.beginPath(); ctx.arc(242, 170, 6, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
             ctx.restore();
 
             // ---- glass shine over the whole window
@@ -2846,7 +2951,7 @@
             last = now;
 
             // ease the mechanical parts toward their targets
-            var headTarget = (st.engaged && !st.ejected) ? 0 : 20;
+            var headTarget = (st.engaged && !st.ejected) ? 0 : 13;
             st.headOffset += (headTarget - st.headOffset) * Math.min(1, dt * 9);
             var shellTarget = st.ejected ? 46 : 0;
             st.shellOffset += (shellTarget - st.shellOffset) * Math.min(1, dt * 7);
@@ -2897,11 +3002,24 @@
           return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
         }
         function showTime(rec){
-          if(!rec || rec.media.type !== 'audio'){ tapeCounterEl.textContent = '--:--'; return; }
-          var el = rec.media.el;
-          var total = isFinite(el.duration) && el.duration ? ' / ' + formatCounter(el.duration) : '';
-          tapeCounterEl.textContent = formatCounter(el.currentTime) + total;
+          if(!rec){ tapeCounterEl.textContent = '00:00'; return; }
+          var cur = 0, dur = 0;
+          if(rec.media.type === 'audio'){ cur = rec.media.el.currentTime; dur = rec.media.el.duration; }
+          else {
+            try{ cur = rec.media.player.getCurrentTime(); dur = rec.media.player.getDuration(); }catch(e){}
+          }
+          var total = isFinite(dur) && dur ? ' / ' + formatCounter(dur) : '';
+          tapeCounterEl.textContent = formatCounter(cur) + total;
         }
+        // video has no timeupdate event, so the deck reads the player on a timer
+        setInterval(function(){
+          if(!active || active.media.type !== 'youtube' || !ytPlaying(active)) return;
+          showTime(active);
+          try{
+            var d = active.media.player.getDuration();
+            if(d) setTapeProgress(active.media.player.getCurrentTime() / d);
+          }catch(e){}
+        }, 400);
 
         var tracks = [];
         var active = null;
@@ -2947,27 +3065,35 @@
           }
           vuLevel += (target - vuLevel) * 0.35;
           vuBars.forEach(function(bar, bi){
-            bar.style.height = Math.max(4, Math.min(100, vuLevel * 100 * (0.82 + bi * 0.12))) + '%';
+            bar.style.height = Math.max(14, Math.min(100, vuLevel * 100 * (0.82 + bi * 0.12))) + '%';
           });
           requestAnimationFrame(vuTick);
         }
         requestAnimationFrame(vuTick);
 
+        function soloTrack(rec){
+          tracks.forEach(function(o){
+            if(o === rec) return;
+            if(o.media.type === 'audio'){ if(!o.media.el.paused) o.media.el.pause(); }
+            else { try{ if(ytPlaying(o)) o.media.player.pauseVideo(); }catch(e){} }
+            o.row.classList.remove('now-playing');
+          });
+        }
+        function ytPlaying(rec){
+          var p = rec.media.player;
+          try{ return !!p && p.getPlayerState && p.getPlayerState() === window.YT.PlayerState.PLAYING; }
+          catch(e){ return false; }
+        }
         function updateSpin(){
           var playing = tracks.some(function(r){
-            return r.media.type === 'audio' ? !r.media.el.paused : !!r.ytPlaying;
+            return r.media.type === 'audio' ? !r.media.el.paused : ytPlaying(r);
           });
           setSpinning(playing);
-        }
-        function postYT(rec, func){
-          var iframe = rec.media.iframe;
-          function send(){ try{ iframe.contentWindow.postMessage(JSON.stringify({ event:'command', func:func, args:[] }), '*'); }catch(e){} }
-          if(rec.ytReady) send(); else setTimeout(send, 400);
         }
         function stopTrack(rec){
           rec.row.classList.remove('now-playing');
           if(rec.media.type === 'audio'){ rec.media.el.pause(); }
-          else { postYT(rec, 'pauseVideo'); rec.ytPlaying = false; updateSpin(); }
+          else { try{ rec.media.player && rec.media.player.pauseVideo(); }catch(e){} updateSpin(); }
           if(active === rec) active = null;
         }
         function playTrack(rec){
@@ -2977,13 +3103,18 @@
           transport.setLabel(rec.title);
           rec.row.classList.add('now-playing');
           if(rec.media.type === 'audio'){ rec.media.el.play(); }
-          else { postYT(rec, 'playVideo'); rec.ytPlaying = true; updateSpin(); }
+          else {
+            if(!rec.media.player){ rec.row.classList.add('unplayable'); return; }
+            try{ rec.media.player.playVideo(); }catch(e){}
+            updateSpin();
+          }
         }
         function toggleTrack(rec){
           if(ejected) return;
           if(active === rec){
             if(rec.media.type === 'audio'){ if(rec.media.el.paused) rec.media.el.play(); else rec.media.el.pause(); }
-            else { stopTrack(rec); }
+            else if(ytPlaying(rec)){ stopTrack(rec); }
+            else { playTrack(rec); }
           } else {
             playTrack(rec);
           }
@@ -3014,15 +3145,18 @@
           if(ejected) return;
           // like a real deck: part-way into a track, skip back returns to its start
           if(active && active.media.type === 'audio' && active.media.el.currentTime > 3){
-            active.media.el.currentTime = 0;
-            showTime(active);
-            return;
+            active.media.el.currentTime = 0; showTime(active); return;
+          }
+          if(active && active.media.type === 'youtube' && active.media.player){
+            try{
+              if(active.media.player.getCurrentTime() > 3){ active.media.player.seekTo(0); return; }
+            }catch(e){}
           }
           playAdjacent(active, -1);
         });
         nextBtn.addEventListener('click', function(){ if(!ejected) playAdjacent(active, 1); });
 
-        function isPlayingRec(rec){ return rec.media.type === 'audio' ? !rec.media.el.paused : !!rec.ytPlaying; }
+        function isPlayingRec(rec){ return rec.media.type === 'audio' ? !rec.media.el.paused : ytPlaying(rec); }
 
         function setEjected(v){
           ejected = v;
@@ -3039,7 +3173,17 @@
 
         var scrubInterval = null;
         function startScrub(dir){
-          if(ejected || !active || active.media.type !== 'audio') return;
+          if(ejected || !active) return;
+          if(active.media.type === 'youtube'){
+            transport.setEngaged(false); transport.setSpeed(dir * 150);
+            scrubInterval = setInterval(function(){
+              try{
+                var pl = active.media.player;
+                pl.seekTo(Math.max(0, pl.getCurrentTime() + dir * 1.6), true);
+              }catch(e){}
+            }, 110);
+            return;
+          }
           // real decks lift the heads off the tape to fast-wind, and the tape flies
           transport.setEngaged(false);
           transport.setSpeed(dir * 150);
@@ -3326,15 +3470,36 @@
           row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span>';
           var rec = { row: row, title: t.title || 'untitled' };
           if(t.type === 'youtube'){
-            var iframe = document.createElement('iframe');
-            iframe.width = '2'; iframe.height = '2';
-            iframe.style.cssText = 'position:absolute;opacity:0;pointer-events:none;';
-            iframe.setAttribute('frameborder', '0');
-            iframe.allow = 'autoplay; encrypted-media';
-            iframe.src = 'https://www.youtube.com/embed/' + t.url + '?enablejsapi=1&playsinline=1';
-            iframe.addEventListener('load', function(){ rec.ytReady = true; });
-            row.appendChild(iframe);
-            rec.media = { type:'youtube', iframe: iframe };
+            // A hidden iframe fired blind postMessages at, with nothing listening
+            // back, only ever *looked* like it was playing. Driven through the real
+            // player API instead, so play/pause actually take and the deck can read
+            // the position back for the counter and the reels.
+            var host = document.createElement('div');
+            host.className = 'yt-host';
+            row.appendChild(host);
+            rec.media = { type:'youtube', host: host, player: null, videoId: t.url };
+            ytReady(function(){
+              rec.media.player = new window.YT.Player(host, {
+                videoId: t.url,
+                playerVars: { playsinline: 1, controls: 0, disablekb: 1 },
+                events: {
+                  onStateChange: function(ev){
+                    var S = window.YT.PlayerState;
+                    if(ev.data === S.PLAYING){
+                      soloTrack(rec);
+                      active = rec; transport.setLabel(rec.title);
+                      row.classList.add('now-playing');
+                    } else {
+                      row.classList.remove('now-playing');
+                      if(active === rec && ev.data !== S.BUFFERING) active = null;
+                      if(ev.data === S.ENDED) playAdjacent(rec, 1, true);
+                    }
+                    updateSpin();
+                  },
+                  onError: function(){ row.classList.add('unplayable'); row.title = 'this video would not play'; }
+                }
+              });
+            });
           } else {
             // deliberately no crossOrigin: asking for CORS makes hosts that don't
             // send the headers refuse to load the file at all, which silently broke
@@ -3345,7 +3510,7 @@
             audio.style.display = 'none';
             row.appendChild(audio);
             rec.media = { type:'audio', el: audio };
-            audio.addEventListener('play', function(){ active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); showTime(rec); });
+            audio.addEventListener('play', function(){ soloTrack(rec); active = rec; transport.setLabel(rec.title); row.classList.add('now-playing'); updateSpin(); showTime(rec); });
             audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); });
             audio.addEventListener('ended', function(){
               row.classList.remove('now-playing');
@@ -3720,7 +3885,7 @@
 
     var pets = [], trail = [], px2 = 0, py2 = 0, travelled = 0, raf = null, lastMove = 0;
     var KEYS = null;
-    var SPAWN_EVERY = 260, MAX_PETS = 4, LIFETIME = 5200;
+    var SPAWN_EVERY = 150, MAX_PETS = 6, LIFETIME = 8000;
 
     function spawn(x, y){
       if(!KEYS) KEYS = Object.keys(STICKERS);
@@ -3775,6 +3940,15 @@
       pets = alive;
       if(pets.length){ raf = requestAnimationFrame(tick); } else { raf = null; }
     }
+
+    // one shows up on its own so you know they are there at all
+    setTimeout(function(){
+      if(pets.length) return;
+      px2 = window.innerWidth * 0.5; py2 = window.innerHeight * 0.45;
+      trail.unshift({ x: px2, y: py2 });
+      spawn(px2 + 60, py2 + 40);
+      if(raf === null) raf = requestAnimationFrame(tick);
+    }, 2600);
 
     window.addEventListener('pointermove', function(e){
       if(e.pointerType === 'touch') return;
