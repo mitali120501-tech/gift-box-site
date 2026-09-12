@@ -94,6 +94,7 @@
     opacity:0; transition: opacity .8s .5s; z-index:2;
   }
   .box-outer.lid-open .box-glow{ opacity:1; }
+  .box-intro{ max-width:430px; margin:2px auto 18px; text-align:center; font-size:14.5px; line-height:1.65; color:#6b5f4e; }
   .step-caption{ font-family:'Caveat', cursive; font-size:1.4rem; margin-top:10px; color:var(--maroon); text-align:center; min-height:1.6em; }
   #boxScreen.taken-out{ opacity:0; transform: scale(.94); pointer-events:none; height:0; overflow:hidden; transition: opacity .5s, transform .5s; }
 
@@ -559,6 +560,7 @@
   <!-- ===================== STEP-BY-STEP BOX ===================== -->
   <div id="boxScreen">
     <h1>A Box, Just For You</h1>
+    <p class="box-intro">A box of handmade things — letters you unfold, flowers that need water, a tape that actually plays. Nothing in here was bought.</p>
     <div class="postmark-inputs">
       <input type="text" id="postmarkFrom" placeholder="from...">
       <input type="text" id="postmarkPlace" placeholder="sent from where...">
@@ -580,7 +582,7 @@
         <div class="postmark" id="postmark" style="display:none;"></div>
       </div>
     </div>
-    <div class="step-caption" id="stepCaption">Step 1 — untie the ribbon</div>
+    <div class="step-caption" id="stepCaption">first, untie the ribbon</div>
     <button id="stepBtn">Untie the ribbon</button>
     <div style="margin-top:14px;"><a href="#" id="homeGalleryLink" class="hand" style="font-size:1.15rem;">🔗 see all the boxes people have built →</a></div>
   </div>
@@ -608,7 +610,7 @@
   <div id="app">
     <div class="app-header">
       <h1>Everything for You</h1>
-      <div class="hand">letters, flowers, a mixtape, your own voice, and a few stickers to mess it all up with</div>
+      <div class="hand">write it, pick it, record it, stick things on it — then tie it up and send the whole box to one person</div>
     </div>
 
     <nav class="tabs">
@@ -627,7 +629,7 @@
     <section class="panel active" id="panel-letters">
       <div class="card">
         <h2>Write, fold, seal</h2>
-        <p class="note">Type it, or switch to "handwrite" and drag your mouse or finger across the paper like a pen. Pick a wax seal, set it to open on a certain date if you like, then fold.</p>
+        <p class="note">Type it, or switch to handwriting and drag your finger across the paper like a pen. Choose a wax seal — and if the letter is meant for one particular day, seal it shut until then. Once it is folded you can decorate the envelope with stickers.</p>
         <div class="icon-row"><button class="small ghost amb-btn" id="ambPaper">📜 paper rustle: off</button></div>
         <div id="lettersGrid"></div>
         <div id="addLetterWrap"><button class="ghost small" id="addLetterBtn">+ add another letter</button></div>
@@ -638,7 +640,7 @@
     <section class="panel" id="panel-bouquet">
       <div class="card">
         <h2>Build a bouquet, stem by stem</h2>
-        <p class="note">Flowers are fetched live from Wikipedia. Click a leaf to pluck it, click a stem's photo to pick it up, drag it into place, tie it off, then set it in the vase.</p>
+        <p class="note">Real flowers, pulled from Wikipedia as you go. Pluck a leaf off if you want, pick a stem up by its photo and drag it where it should sit, then tie the bunch and stand it in water. Whoever opens the box can pull the blooms about and they will sway back.</p>
         <div class="icon-row"><button class="small" id="shuffleBouquet">🔄 fresh stems</button></div>
 
         <div id="bouquetBin" class="bouquet-bin"><div class="flower-loading">gathering flowers…</div></div>
@@ -653,7 +655,7 @@
 
         <div id="vaseScene" class="vase-scene" style="display:none;"></div>
 
-        <h3 style="margin-top:26px;">If you want the real thing</h3>
+        <h3 style="margin-top:26px;">If you would rather do this with actual flowers</h3>
         <ol class="howto">
           <li>Strip the lower leaves off each stem so nothing sits below the waterline.</li>
           <li>Hold the tallest, sturdiest flower first and add the rest around it in a gentle spiral, turning the bunch as you go.</li>
@@ -671,7 +673,7 @@
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" stroke-width="1.6"><path d="M4 18c0-6 3-11 8-11s8 5 8 11" /><path d="M4 18h3v-5H4z"/><path d="M17 18h3v-5h-3z"/><circle cx="12" cy="6" r="1.4" fill="var(--maroon)"/></svg>
           <h2 style="margin:0;">A mixtape of open-source music</h2>
         </div>
-        <p class="note">Tracks come live from Wikimedia Commons, Openverse, and the Internet Archive's open-licensed audio. Add a few to Side A, flip the format, press play.</p>
+        <p class="note">Open-licensed music from Wikimedia Commons, Openverse and the Internet Archive — or paste in a YouTube link. Fill up Side A, and say why in the liner notes. Whoever opens the box gets a tape deck and a turntable to play it on.</p>
         <div class="format-toggle">
           <button class="small" id="fmtCassette">📼 Cassette</button>
           <button class="small ghost" id="fmtVinyl">💿 Vinyl</button>
@@ -690,7 +692,7 @@
         <div id="trackBrowser"></div>
 
         <h3 style="margin-top:18px;">📺 From YouTube</h3>
-        <p class="note">Paste a link — always works. "Search" tries a couple of public search mirrors and may occasionally be unavailable.</p>
+        <p class="note">Pasting a link always works. Search goes through public mirrors, which are sometimes down — if nothing comes back, paste the link instead.</p>
         <div class="yt-paste-row">
           <input type="text" id="ytLinkInput" placeholder="paste a YouTube link or video ID">
           <button class="small" id="ytLinkAdd">+ add</button>
@@ -702,10 +704,10 @@
         <div id="ytResults"></div>
 
         <h3 style="margin-top:18px;">Side A tracklist</h3>
-        <div id="tracklist"><p class="note">Nothing added yet — browse tracks above.</p></div>
+        <div id="tracklist"><p class="note">Side A is empty — find something above.</p></div>
 
         <h3 style="margin-top:18px;">Liner notes</h3>
-        <textarea id="linerNotes" placeholder="why these songs, in your own handwriting-in-spirit..." style="width:100%; min-height:80px; font-family:'Caveat',cursive; font-size:1.2rem;"></textarea>
+        <textarea id="linerNotes" placeholder="why these songs, and what they are supposed to say..." style="width:100%; min-height:80px; font-family:'Caveat',cursive; font-size:1.2rem;"></textarea>
       </div>
     </section>
 
@@ -716,7 +718,7 @@
           <svg class="earphone-badge" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" stroke-width="1.7"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="12" width="4" height="7" rx="1.5"/><rect x="17.5" y="12" width="4" height="7" rx="1.5"/></svg>
           <h2 style="margin:0;">Real voice notes</h2>
         </div>
-        <p class="note">This actually records your microphone in your browser — nothing is uploaded anywhere. Say something, then keep it or add it straight to the mixtape.</p>
+        <p class="note">This records your actual microphone, here in the browser. Nothing leaves the page until you build the box — then the recording travels inside it, on its own little cassette. Say the thing you would not write down.</p>
         <div class="icon-row">
           <button class="rec-btn" id="recBtn">● Record</button>
           <button class="ghost" id="stopBtn" disabled>■ Stop</button>
@@ -730,7 +732,7 @@
     <section class="panel" id="panel-album">
       <div class="card">
         <h2>Photo album</h2>
-        <p class="note">Add your own photos — they stay on this page only, styled like little polaroids. Give each one a caption.</p>
+        <p class="note">Your own photographs, printed as polaroids. Write on the white strip under each one — that caption is what someone reads when they pick the photo up and turn it over.</p>
         <div class="icon-row"><input type="file" id="photoInput" accept="image/*" multiple></div>
         <div id="albumGrid"></div>
       </div>
@@ -741,7 +743,7 @@
       <div class="card">
         <h2>Pixel stickers</h2>
         <div id="pixelEditorWrap">
-          <h3>Make your own</h3>
+          <h3>Draw your own</h3>
           <div class="pe-colors" id="peColors"></div>
           <div id="pixelGrid"></div>
           <div class="icon-row" style="margin-top:6px;">
@@ -749,7 +751,7 @@
             <button class="small" id="peSave">add to palette →</button>
           </div>
         </div>
-        <p class="note">Tap any sticker below to drop it on the box lid, then drag it wherever you like.</p>
+        <p class="note">Tap a sticker to drop it on the lid, then drag it where you want it. Hover over one in the tray to save it as a PNG and keep it. Draw your own in the grid above.</p>
         <div class="sticker-palette" id="stickerPalette"></div>
         <div id="decorateCanvas"></div>
       </div>
@@ -759,7 +761,7 @@
     <section class="panel" id="panel-doodle">
       <div class="card">
         <h2>Doodle pad</h2>
-        <p class="note">A little jsPaint-style canvas — freehand draw, pick a colour and brush size, then save it as a downloadable PNG or drop it straight into your stickers.</p>
+        <p class="note">A plain canvas and a brush, the way drawing programs used to be. Pick a colour and a size, draw badly on purpose, then keep it as a PNG or turn it into a sticker.</p>
         <div class="doodle-toolbar">
           <input type="color" id="doodleColor" value="#7A2E2E">
           <label class="note">size <input type="range" id="doodleSize" min="1" max="24" value="5"></label>
@@ -777,7 +779,7 @@
     <!-- BUILD & SHARE -->
     <div class="build-bar">
       <h2>Build your box</h2>
-      <p class="note">Bundle everything above — letters, bouquet pick, tracklist, photos, stickers — into one box, then share it or send it.</p>
+      <p class="note">This ties everything above into one box and gives it a link of its own. Send that link to one person. The box stays exactly as you left it, for as long as they want to keep coming back to it.</p>
       <div class="icon-row"><button id="buildBoxBtn">🎁 build &amp; share this box</button></div>
       <div id="buildResult"></div>
     </div>
@@ -786,7 +788,7 @@
     <section class="panel" id="panel-gallery">
       <div class="card">
         <h2>My Boxes</h2>
-        <p class="note" id="galleryNote">Every box you build with the button above shows up here, with a link anyone can open.</p>
+        <p class="note" id="galleryNote">Every box that has been built, and the link that opens it.</p>
         <div class="icon-row"><button class="small ghost" id="refreshGallery">↻ refresh</button></div>
         <div class="gallery-grid" id="galleryGrid"></div>
       </div>
@@ -796,19 +798,19 @@
     <section class="panel" id="panel-extras">
       <div class="card">
         <h2>A recipe worth keeping</h2>
-        <p class="note">A little index card for a recipe that matters to the two of you.</p>
+        <p class="note">An index card for the recipe you would want them to still have in twenty years. Handwriting on the title line, method underneath.</p>
         <div class="recipe-grid" id="recipeGrid"></div>
         <div class="icon-row"><button class="small ghost" id="addRecipeBtn">+ add another recipe</button></div>
       </div>
       <div class="card" style="margin-top:20px;">
         <h2>Open when...</h2>
-        <p class="note">Little envelopes, each with a note tucked inside, labelled for the moment it's meant for.</p>
+        <p class="note">Small sealed notes, each labelled for the moment it is meant to be opened in. Open when you miss me. Open when you cannot sleep. They stay shut until then.</p>
         <div class="openwhen-grid" id="openWhenGrid"></div>
         <div class="icon-row"><button class="small ghost" id="addOpenWhenBtn">+ add another envelope</button></div>
       </div>
     </section>
 
-    <footer>Flowers &amp; tracks are fetched live from Wikipedia, Wikimedia Commons, Openverse and the Internet Archive under their open licenses — open a stem or track's link for the exact credit.</footer>
+    <footer>Made by hand, with borrowed flowers and borrowed songs. Everything comes from Wikipedia, Wikimedia Commons, Openverse and the Internet Archive under their open licences — open any stem or track to see who to thank. Your photos, your voice and your handwriting never leave the page until you build the box.</footer>
   </div>
 </div>
 
@@ -828,11 +830,11 @@
     boxStep++;
     if(boxStep === 1){
       boxOuter.classList.add('untied');
-      stepCaption.textContent = 'Step 2 — lift the lid';
+      stepCaption.textContent = 'now lift the lid';
       stepBtn.textContent = 'Lift the lid';
     } else if(boxStep === 2){
       boxOuter.classList.add('lid-open');
-      stepCaption.textContent = 'Step 3 — take everything out';
+      stepCaption.textContent = 'and take everything out';
       stepBtn.textContent = 'Take everything out';
     } else if(boxStep === 3){
       stepCaption.textContent = '';
@@ -1304,7 +1306,7 @@
 
     var caption = document.createElement('div');
     caption.className = 'vase-caption';
-    caption.textContent = 'tied and standing in the vase — pull a bloom and let it spring back';
+    caption.textContent = 'pull a bloom and let go — tap one to see what it is';
     target.appendChild(caption);
 
     // ---- build a rest curve per stem, then a rope of points along it
@@ -1724,14 +1726,14 @@
   }
 
   document.getElementById('loadTracksBtn').addEventListener('click', function(){
-    trackBrowser.innerHTML = '<p class="note">searching Wikimedia Commons, Openverse, and the Internet Archive…</p>';
+    trackBrowser.innerHTML = '<p class="note">going through Wikimedia Commons, Openverse and the Internet Archive…</p>';
     var term = ['piano','folk song','orchestra','acoustic guitar'][Math.floor(Math.random()*4)];
     Promise.all([fetchCommonsAudio(term), fetchOpenverseAudio(term), fetchArchiveAudio(term)]).then(function(results){
       var all = [].concat.apply([], results);
       var seen = {};
       all = all.filter(function(t){ if(seen[t.url]) return false; seen[t.url]=true; return true; });
       if(all.length === 0){
-        trackBrowser.innerHTML = '<p class="note">Couldn\'t reach any of the music sources right now — try again in a moment.</p>';
+        trackBrowser.innerHTML = '<p class="note">None of the music archives answered just now. Give it a moment and try again, or paste a YouTube link instead.</p>';
         return;
       }
       trackBrowser.innerHTML = '';
@@ -1751,7 +1753,7 @@
   }
 
   function renderTracklist(){
-    if(tracklist.length === 0){ tracklistEl.innerHTML = '<p class="note">Nothing added yet — browse tracks above.</p>'; return; }
+    if(tracklist.length === 0){ tracklistEl.innerHTML = '<p class="note">Side A is empty — find something above.</p>'; return; }
     tracklistEl.innerHTML = '';
     tracklist.forEach(function(t, idx){
       var row = document.createElement('div');
@@ -1805,7 +1807,7 @@
     resultsEl.innerHTML = '<p class="note">searching…</p>';
     tryYouTubeSearch(term, 0).then(function(results){
       if(!results || results.length === 0){
-        resultsEl.innerHTML = '<p class="note">Live search is unavailable right now — paste a YouTube link above instead.</p>';
+        resultsEl.innerHTML = '<p class="note">The search mirrors are down. Paste the link itself above — that always works.</p>';
         return;
       }
       resultsEl.innerHTML = '';
@@ -1841,7 +1843,7 @@
 
   recBtn.addEventListener('click', function(){
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      recStatus.textContent = 'Microphone recording isn\'t available in this browser.';
+      recStatus.textContent = 'This browser will not let the page record. Try Chrome or Firefox on a laptop.';
       return;
     }
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
@@ -1860,9 +1862,9 @@
       };
       mediaRecorder.start();
       recBtn.disabled = true; stopBtn.disabled = false;
-      recStatus.textContent = 'recording…';
+      recStatus.textContent = 'recording — say it';
     }).catch(function(){
-      recStatus.textContent = 'Microphone access was blocked — allow it in your browser to record.';
+      recStatus.textContent = 'The microphone is blocked. Allow it in your browser, then press record again.';
     });
   });
 
@@ -2345,7 +2347,7 @@
   function refreshGallery(){
     boxStorage.get('gallery-index').then(function(res){
       var index = res && res.value ? JSON.parse(res.value) : [];
-      if(index.length === 0){ renderGalleryEmpty('No boxes built yet — press "build & share this box" above.'); return; }
+      if(index.length === 0){ renderGalleryEmpty('Nothing built yet. Make something in the tabs above, then press build and share.'); return; }
       var grid = document.getElementById('galleryGrid');
       grid.innerHTML = '';
       index.slice().reverse().forEach(function(entry){
@@ -2362,7 +2364,7 @@
         });
         grid.appendChild(card);
       });
-    }).catch(function(){ renderGalleryEmpty('Could not reach shared storage right now.'); });
+    }).catch(function(){ renderGalleryEmpty('Could not reach the shelf where the boxes are kept. Try again in a moment.'); });
   }
   document.getElementById('refreshGallery').addEventListener('click', refreshGallery);
 
@@ -2431,7 +2433,7 @@
 
         var hint = document.createElement('div');
         hint.className = 'viewer-tap-hint';
-        hint.textContent = 'tap to open the iris';
+        hint.textContent = 'tap to open it';
         container.appendChild(hint);
 
         /* ---------------- the iris ----------------
@@ -2570,7 +2572,7 @@
             scene.classList.remove('unfolded');
             setTimeout(function(){ scene.classList.remove('broken'); }, 500);
             setTimeout(function(){ iris.close(); }, 620);
-            setTimeout(function(){ hint.textContent = 'tap to open the iris'; busy = false; }, 900);
+            setTimeout(function(){ hint.textContent = 'tap to open it'; busy = false; }, 900);
           }
         });
       }});
@@ -3614,7 +3616,7 @@
     viewerDots.innerHTML = '';
     viewerFinaleShown = false;
     if(viewerSlides.length === 0){
-      viewerSlideArea.innerHTML = '<p class="note" style="text-align:center;">This box looks empty.</p>';
+      viewerSlideArea.innerHTML = '<p class="note" style="text-align:center;">This box came through empty. Whoever sent it may still be filling it.</p>';
     } else {
       viewerSlides.forEach(function(slide, i){
         var slideEl = document.createElement('div');
@@ -3667,7 +3669,7 @@
     var state = gatherBoxState();
     var name = 'Box ' + new Date().toLocaleDateString();
     var id = 'b' + Date.now() + Math.floor(Math.random()*1000);
-    resultEl.innerHTML = '<p class="note">building…</p>';
+    resultEl.innerHTML = '<p class="note">tying it up…</p>';
     boxStorage.set('box:' + id, JSON.stringify(state)).then(function(){
       return boxStorage.get('gallery-index').catch(function(){ return null; });
     }).then(function(res){
@@ -3683,7 +3685,7 @@
       });
       refreshGallery();
     }).catch(function(){
-      resultEl.innerHTML = '<p class="note">Couldn\'t reach shared storage — here\'s a file you can send instead.</p>';
+      resultEl.innerHTML = '<p class="note">Could not reach storage, so here is the whole box as a file you can send instead.</p>';
       offerDownload(state, resultEl);
     });
   });
@@ -3691,7 +3693,7 @@
   function offerDownload(state, resultEl){
     var blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
-    resultEl.innerHTML = '<p class="note">Here\'s a file you can send instead — the recipient opens this page and loads it with the button below.</p>' +
+    resultEl.innerHTML = '<p class="note">Here is the box as a file. Send it however you like — whoever gets it opens this page and loads it with the button below.</p>' +
       '<a download="my-gift-box.json" href="'+url+'"><button class="small">⬇ download this box</button></a> ' +
       '<button class="small ghost" id="loadBoxFileBtn">load a box file</button><input type="file" id="loadBoxFile" accept="application/json" style="display:none;">';
     document.getElementById('loadBoxFileBtn').addEventListener('click', function(){ document.getElementById('loadBoxFile').click(); });
