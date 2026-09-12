@@ -1865,7 +1865,7 @@
         opens.forEach(function(o){
           var ow = document.createElement('div');
           ow.className = 'viewer-openwhen';
-          ow.innerHTML = '<strong>💌 open when '+escapeHtml(o.label || '...')+'</strong><div class="viewer-ow-note"></div>';
+          ow.innerHTML = '<strong>💌 '+escapeHtml(o.label || 'open when...')+'</strong><div class="viewer-ow-note"></div>';
           ow.querySelector('.viewer-ow-note').textContent = o.note || '';
           ow.addEventListener('click', function(){ ow.classList.toggle('open'); });
           container.appendChild(ow);
