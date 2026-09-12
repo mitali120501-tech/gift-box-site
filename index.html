@@ -402,8 +402,20 @@
   .viewer-letter-card.open .viewer-envelope-stickers{ opacity:0; }
   .viewer-envelope-stickers .placed-sticker{ position:absolute; }
   .viewer-cassette-mixtape .format-toggle{ display:flex; gap:8px; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
-  .viewer-cassette-mixtape .track-row{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:0 0 14px; }
+  .viewer-cassette-mixtape .track-row{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:0 0 10px; cursor:pointer; padding:6px 10px; border-radius:8px; transition:background .2s; }
+  .viewer-cassette-mixtape .track-row:hover{ background:var(--paper-dark); }
+  .viewer-cassette-mixtape .track-row.now-playing .title{ color:var(--maroon); font-weight:600; }
+  .viewer-cassette-mixtape .track-row.now-playing .title::before{ content:'▶ '; }
   .viewer-cassette-mixtape .track-row .title{ font-size:14px; }
+  .viewer-cassette-mixtape .cassette{ cursor:pointer; }
+  .viewer-cassette-mixtape .reel{ display:flex; align-items:center; justify-content:center; }
+  .viewer-cassette-mixtape .reel .tape-wound{ width:30px; height:30px; border-radius:50%; background:#C9A574; transition:width .2s linear, height .2s linear; }
+  .viewer-cassette-mixtape .tape-hint{ text-align:center; font-size:12px; color:#6b5f4e; margin:-4px 0 10px; }
+  .viewer-vinyl-view{ position:relative; width:210px; margin:0 auto 16px; cursor:pointer; }
+  .viewer-vinyl-view .vinyl{ margin:0; }
+  .viewer-vinyl-view .tonearm-base{ position:absolute; top:0; right:4px; width:18px; height:18px; border-radius:50%; background:#3B3532; box-shadow:0 2px 4px rgba(0,0,0,.4); z-index:4; }
+  .viewer-vinyl-view .tonearm-arm{ position:absolute; top:8px; right:12px; width:6px; height:96px; background:linear-gradient(180deg,#C9A574,#8a6b3f); border-radius:3px; transform-origin: top center; transform: rotate(-32deg); transition: transform .6s cubic-bezier(.4,0,.2,1); z-index:4; }
+  .viewer-vinyl-view.playing .tonearm-arm{ transform: rotate(-4deg); }
   .viewer-nav{ display:flex; align-items:center; justify-content:center; gap:14px; margin-top:18px; }
   .viewer-dots{ display:flex; gap:6px; }
   .viewer-dot{ width:9px; height:9px; border-radius:50%; background:var(--kraft-dark); cursor:pointer; }
@@ -1869,14 +1881,21 @@
             '<button class="small ghost viewer-fmt-btn" data-fmt="vinyl">💿 Vinyl</button>' +
           '</div>' +
           '<div class="viewer-cassette-view">' +
-            '<div class="cassette"><div class="window"><div class="reel"></div><div class="reel"></div></div>' +
-            '<div class="label">SIDE A — MADE WITH LOVE</div></div>' +
+            '<div class="cassette"><div class="window">' +
+              '<div class="reel"><div class="tape-wound"></div></div>' +
+              '<div class="reel"><div class="tape-wound"></div></div>' +
+            '</div><div class="label">SIDE A — MADE WITH LOVE</div></div>' +
+            '<p class="tape-hint note">tap the cassette to play / pause</p>' +
           '</div>' +
-          '<div class="viewer-vinyl-view" style="display:none;"><div class="vinyl"></div></div>';
+          '<div class="viewer-vinyl-view" style="display:none;">' +
+            '<div class="vinyl"></div><div class="tonearm-base"></div><div class="tonearm-arm"></div>' +
+          '</div>';
         container.appendChild(wrap);
 
         var reels = wrap.querySelectorAll('.reel');
+        var tapeWounds = wrap.querySelectorAll('.tape-wound');
         var vinylDisc = wrap.querySelector('.vinyl');
+        var cassetteEl = wrap.querySelector('.cassette');
         var cassetteView = wrap.querySelector('.viewer-cassette-view');
         var vinylView = wrap.querySelector('.viewer-vinyl-view');
         var fmtBtns = wrap.querySelectorAll('.viewer-fmt-btn');
@@ -1891,21 +1910,89 @@
         });
         fmtBtns[0].classList.remove('ghost');
 
+        function setSpinning(spinning){
+          reels.forEach(function(r){ r.classList.toggle('spin', spinning); });
+          vinylDisc.classList.toggle('spin', spinning);
+          vinylView.classList.toggle('playing', spinning);
+        }
+        function setTapeProgress(p){
+          var leftSize = 30 - p*20, rightSize = 10 + p*20;
+          tapeWounds[0].style.width = leftSize + 'px'; tapeWounds[0].style.height = leftSize + 'px';
+          tapeWounds[1].style.width = rightSize + 'px'; tapeWounds[1].style.height = rightSize + 'px';
+        }
+
+        var tracks = [];
+        var active = null;
+
+        function updateSpin(){
+          var playing = tracks.some(function(r){
+            return r.media.type === 'audio' ? !r.media.el.paused : !!r.ytPlaying;
+          });
+          setSpinning(playing);
+        }
+        function postYT(rec, func){
+          var iframe = rec.media.iframe;
+          function send(){ try{ iframe.contentWindow.postMessage(JSON.stringify({ event:'command', func:func, args:[] }), '*'); }catch(e){} }
+          if(rec.ytReady) send(); else setTimeout(send, 400);
+        }
+        function stopTrack(rec){
+          rec.row.classList.remove('now-playing');
+          if(rec.media.type === 'audio'){ rec.media.el.pause(); }
+          else { postYT(rec, 'pauseVideo'); rec.ytPlaying = false; updateSpin(); }
+          if(active === rec) active = null;
+        }
+        function playTrack(rec){
+          if(active && active !== rec) stopTrack(active);
+          active = rec;
+          rec.row.classList.add('now-playing');
+          if(rec.media.type === 'audio'){ rec.media.el.play(); }
+          else { postYT(rec, 'playVideo'); rec.ytPlaying = true; updateSpin(); }
+        }
+        function toggleTrack(rec){
+          if(active === rec){
+            if(rec.media.type === 'audio'){ if(rec.media.el.paused) rec.media.el.play(); else rec.media.el.pause(); }
+            else { stopTrack(rec); }
+          } else {
+            playTrack(rec);
+          }
+        }
+        function toggleActiveOrFirst(){
+          if(active) toggleTrack(active);
+          else if(tracks.length) playTrack(tracks[0]);
+        }
+        cassetteEl.addEventListener('click', toggleActiveOrFirst);
+        vinylView.addEventListener('click', toggleActiveOrFirst);
+
         var tracksEl = document.createElement('div');
         tracksEl.style.marginTop = '16px';
         (state.tracklist || []).forEach(function(t, idx){
           var row = document.createElement('div');
           row.className = 'track-row';
+          row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span>';
+          var rec = { row: row };
           if(t.type === 'youtube'){
-            row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span>' +
-              '<iframe width="220" height="130" src="https://www.youtube.com/embed/' + t.url + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
+            var iframe = document.createElement('iframe');
+            iframe.width = '2'; iframe.height = '2';
+            iframe.style.cssText = 'position:absolute;opacity:0;pointer-events:none;';
+            iframe.setAttribute('frameborder', '0');
+            iframe.allow = 'autoplay; encrypted-media';
+            iframe.src = 'https://www.youtube.com/embed/' + t.url + '?enablejsapi=1&playsinline=1';
+            iframe.addEventListener('load', function(){ rec.ytReady = true; });
+            row.appendChild(iframe);
+            rec.media = { type:'youtube', iframe: iframe };
           } else {
-            row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span><audio controls src="' + t.url + '"></audio>';
-            var audio = row.querySelector('audio');
-            audio.addEventListener('play', function(){ reels.forEach(function(r){ r.classList.add('spin'); }); vinylDisc.classList.add('spin'); });
-            audio.addEventListener('pause', function(){ reels.forEach(function(r){ r.classList.remove('spin'); }); vinylDisc.classList.remove('spin'); });
-            audio.addEventListener('ended', function(){ reels.forEach(function(r){ r.classList.remove('spin'); }); vinylDisc.classList.remove('spin'); });
+            var audio = document.createElement('audio');
+            audio.src = t.url;
+            audio.style.display = 'none';
+            row.appendChild(audio);
+            rec.media = { type:'audio', el: audio };
+            audio.addEventListener('play', function(){ active = rec; row.classList.add('now-playing'); updateSpin(); });
+            audio.addEventListener('pause', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); });
+            audio.addEventListener('ended', function(){ row.classList.remove('now-playing'); if(active === rec){ active = null; } updateSpin(); setTapeProgress(0); });
+            audio.addEventListener('timeupdate', function(){ if(audio.duration) setTapeProgress(audio.currentTime / audio.duration); });
           }
+          row.addEventListener('click', function(){ toggleTrack(rec); });
+          tracks.push(rec);
           tracksEl.appendChild(row);
         });
         container.appendChild(tracksEl);
