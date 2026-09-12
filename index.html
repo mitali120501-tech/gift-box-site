@@ -344,6 +344,59 @@
   .rec-btn{ background:var(--rose); }
   .rec-btn[disabled]{ background:var(--kraft); color:#6b5f4e; box-shadow:none; cursor:default; }
 
+  /* ---------- VIEWER (read-only opened box) ---------- */
+  .viewer-screen{
+    max-width:640px; margin:0 auto; opacity:0; transform: translateY(16px) scale(.97);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.2,1.4,.4,1);
+  }
+  .viewer-screen.show{ opacity:1; transform: translateY(0) scale(1); }
+  .viewer-header{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .viewer-header h1{ margin:0; }
+  .viewer-slide-area{ min-height:320px; position:relative; overflow:hidden; }
+  .viewer-slide{ display:none; }
+  .viewer-slide.active{ display:block; }
+  .viewer-slide.active.enter-next{ animation: slideInRight .45s cubic-bezier(.2,1,.3,1); }
+  .viewer-slide.active.enter-prev{ animation: slideInLeft .45s cubic-bezier(.2,1,.3,1); }
+  @keyframes slideInRight{ from{ opacity:0; transform: translateX(40px); } to{ opacity:1; transform:translateX(0); } }
+  @keyframes slideInLeft{ from{ opacity:0; transform: translateX(-40px); } to{ opacity:1; transform:translateX(0); } }
+  .viewer-slide h3{ text-align:center; margin-top:0; }
+  .viewer-letter-card{ width:300px; height:270px; margin:0 auto 14px; position:relative; perspective:1300px; cursor:pointer; }
+  .viewer-letter-card .viewer-letter-paper{
+    position:absolute; inset:0; width:100%; height:100%; background:var(--paper); border:1px solid var(--kraft-dark);
+    font-family:'Caveat', cursive; font-size:1.35rem; color:var(--ink); line-height:1.4; padding:16px; overflow:auto; white-space:pre-wrap;
+  }
+  .viewer-letter-card .viewer-flap{
+    position:absolute; left:0; width:100%; height:90px; background: linear-gradient(180deg, var(--kraft) 0%, var(--kraft-dark) 100%);
+    z-index:2; backface-visibility:hidden; transition: transform .8s cubic-bezier(.7,0,.3,1); box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .viewer-letter-card .viewer-flap-top{ top:0; transform-origin:bottom; border-radius:6px 6px 0 0; transform: rotateX(0deg); }
+  .viewer-letter-card .viewer-flap-bottom{ bottom:0; transform-origin:top; border-radius:0 0 6px 6px; transform: rotateX(0deg); }
+  .viewer-letter-card.open .viewer-flap-top{ transform: rotateX(180deg); }
+  .viewer-letter-card.open .viewer-flap-bottom{ transform: rotateX(-180deg); }
+  .viewer-letter-card .viewer-seal{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(1); z-index:3;
+    width:46px; height:46px; border-radius:50%; box-shadow:0 2px 5px rgba(0,0,0,.4); opacity:1;
+    display:flex; align-items:center; justify-content:center; color:#f2dcb8; font-family:'Fraunces',serif; font-size:18px;
+    transition: opacity .3s, transform .3s;
+  }
+  .viewer-letter-card.open .viewer-seal{ opacity:0; transform:translate(-50%,-50%) scale(.4); }
+  .viewer-letter-card .viewer-tap-hint{ text-align:center; font-size:12px; color:#6b5f4e; margin-top:6px; }
+  .viewer-polaroid{ display:inline-block; background:#fff; padding:10px 10px 26px; box-shadow:0 4px 10px rgba(0,0,0,.2); margin:10px; border-radius:2px; }
+  .viewer-polaroid img{ width:200px; height:200px; object-fit:cover; display:block; }
+  .viewer-polaroid .viewer-caption{ text-align:center; font-family:'Caveat', cursive; font-size:1.1rem; margin-top:6px; }
+  .viewer-album-grid{ display:flex; flex-wrap:wrap; justify-content:center; }
+  .viewer-openwhen{ background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:8px; padding:12px; margin-bottom:10px; cursor:pointer; }
+  .viewer-openwhen .viewer-ow-note{ display:none; margin-top:8px; font-family:'Caveat', cursive; font-size:1.2rem; white-space:pre-wrap; }
+  .viewer-openwhen.open .viewer-ow-note{ display:block; }
+  .viewer-recipe{ background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:8px; padding:12px; margin-bottom:10px; }
+  .viewer-recipe h4{ margin:0 0 6px; }
+  .viewer-sticker-canvas{ position:relative; width:100%; max-width:500px; min-height:320px; margin:0 auto; background:var(--paper-dark); border:1px solid var(--kraft-dark); border-radius:10px; overflow:hidden; }
+  .viewer-sticker-canvas .placed-sticker{ position:absolute; pointer-events:none; }
+  .viewer-nav{ display:flex; align-items:center; justify-content:center; gap:14px; margin-top:18px; }
+  .viewer-dots{ display:flex; gap:6px; }
+  .viewer-dot{ width:9px; height:9px; border-radius:50%; background:var(--kraft-dark); cursor:pointer; }
+  .viewer-dot.active{ background:var(--maroon); }
+
   /* ---------- RESPONSIVE / MOBILE ---------- */
   @media (max-width: 480px){
     body{ padding:16px 10px 48px; }
@@ -390,6 +443,20 @@
   </div>
 
   <div class="stamp-overlay" id="stampOverlay"><div class="big-seal" id="bigSeal">✦</div></div>
+
+  <!-- ===================== VIEWER (read-only opened box) ===================== -->
+  <div id="viewerScreen" class="viewer-screen" style="display:none;">
+    <div class="viewer-header">
+      <h1 id="viewerTitle">A Box For You</h1>
+      <button class="small ghost" id="viewerNewBoxBtn">🎁 make your own box</button>
+    </div>
+    <div class="viewer-slide-area" id="viewerSlideArea"></div>
+    <div class="viewer-nav">
+      <button class="small ghost" id="viewerPrev">‹ prev</button>
+      <span class="viewer-dots" id="viewerDots"></span>
+      <button class="small ghost" id="viewerNext">next ›</button>
+    </div>
+  </div>
 
   <!-- ===================== MAIN APP ===================== -->
   <div id="app">
@@ -604,6 +671,7 @@
 
   /* ---------------- BOX OPENING SEQUENCE ---------------- */
   var boxStep = 0;
+  var pendingBoxPromise = null; // a shared box's fetch, awaited before the ribbon/lid ceremony reveals it
   var boxOuter = document.getElementById('boxOuter');
   var stepCaption = document.getElementById('stepCaption');
   var stepBtn = document.getElementById('stepBtn');
@@ -626,7 +694,13 @@
       boxScreen.classList.add('taken-out');
       setTimeout(function(){
         boxScreen.style.display = 'none';
-        app.classList.add('show');
+        if(pendingBoxPromise){
+          pendingBoxPromise.then(function(state){
+            if(state) renderBoxViewer(state); else app.classList.add('show');
+          });
+        } else {
+          app.classList.add('show');
+        }
       }, 500);
     }
   });
@@ -936,7 +1010,8 @@
     vaseBtn.disabled = false;
   });
 
-  function renderVaseScene(stems){
+  function renderVaseScene(stems, target){
+    target = target || vaseScene;
     var W = 320, H = 340, vaseW = 140, vaseH = 140;
     var vaseX = W / 2, vaseTopY = H - vaseH;
     var tieX = vaseX, tieY = vaseTopY + 34;
@@ -963,13 +1038,13 @@
       'style="left:' + (vaseX - vaseW / 2) + 'px; top:' + vaseTopY + 'px;">' +
       '<path d="M50 20 L90 20 L100 60 C110 90 100 120 70 120 C40 120 30 90 40 60 Z" fill="#7A2E2E"/></svg>';
 
-    vaseScene.innerHTML = stemsSvg + vaseSvg;
+    target.innerHTML = stemsSvg + vaseSvg;
 
     var knot = document.createElement('div');
     knot.className = 'tie-knot';
     knot.style.left = (tieX - 17) + 'px';
     knot.style.top = (vaseTopY - 15) + 'px';
-    vaseScene.appendChild(knot);
+    target.appendChild(knot);
 
     heads.forEach(function(p, i){
       var s = stems[i];
@@ -980,23 +1055,23 @@
       el.style.setProperty('--droop-angle', (p.angle * 0.4).toFixed(1) + 'deg');
       el.style.animationDelay = (i * 0.15) + 's';
       el.innerHTML = '<img src="'+s.img+'" alt="'+s.title+'">' + leafRowHTML(s.leaves || [true,true]);
-      vaseScene.appendChild(el);
+      target.appendChild(el);
     });
 
     var caption = document.createElement('div');
     caption.className = 'vase-caption';
     caption.textContent = 'picked, tied, and resting in the vase — click it 🌿';
-    vaseScene.appendChild(caption);
-    vaseScene.style.display = 'block';
-    vaseScene.onclick = function(e){
+    target.appendChild(caption);
+    target.style.display = 'block';
+    target.onclick = function(e){
       if(e.target.closest('.vase-caption')) return;
       var petal = document.createElement('div');
       petal.className = 'vase-petal';
       petal.style.background = ['#B23A48','#E8A0BC','#D9A441'][Math.floor(Math.random()*3)];
-      var rect = vaseScene.getBoundingClientRect();
+      var rect = target.getBoundingClientRect();
       petal.style.left = (e.clientX - rect.left) + 'px';
       petal.style.top = (e.clientY - rect.top) + 'px';
-      vaseScene.appendChild(petal);
+      target.appendChild(petal);
       setTimeout(function(){ petal.remove(); }, 1700);
     };
   }
@@ -1665,64 +1740,224 @@
   }
   document.getElementById('refreshGallery').addEventListener('click', refreshGallery);
 
-  function loadBoxById(id){
-    boxStorage.get('box:' + id).then(function(res){
-      if(!res || !res.value) return;
-      applyBoxState(JSON.parse(res.value));
-      tabButtons[0].click();
-    }).catch(function(){});
+  function loadBoxById(id, throughRibbon){
+    var promise = boxStorage.get('box:' + id).then(function(res){
+      return (res && res.value) ? JSON.parse(res.value) : null;
+    }).catch(function(){ return null; });
+    if(throughRibbon){
+      pendingBoxPromise = promise;
+    } else {
+      promise.then(function(state){ if(state) renderBoxViewer(state); });
+    }
   }
 
-  function applyBoxState(state){
-    lettersGrid.innerHTML = ''; letters = []; letterCount = 0;
-    (state.letters || []).forEach(function(l){
-      addLetter(l.text || '');
-      var rec = letters[letters.length - 1];
-      if(l.handwriting){
-        var img = new Image();
-        img.onload = function(){ rec.canvas.getContext('2d').drawImage(img,0,0); };
-        img.src = l.handwriting;
-        rec.card.classList.add('handwrite');
-      }
-      if(l.unlockDate){
-        rec.unlockInput.value = l.unlockDate;
-        rec.card.classList.add('folded');
-        rec.unlockInput.dispatchEvent(new Event('change'));
-      }
+  /* ---------------- VIEWER: read-only presentation of an opened box ---------------- */
+  var viewerScreen = document.getElementById('viewerScreen');
+  var viewerSlideArea = document.getElementById('viewerSlideArea');
+  var viewerDots = document.getElementById('viewerDots');
+  var viewerPrev = document.getElementById('viewerPrev');
+  var viewerNext = document.getElementById('viewerNext');
+  var viewerSlides = [];
+  var viewerIndex = 0;
+
+  function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function buildViewerSlides(state){
+    var slides = [];
+
+    (state.letters || []).forEach(function(l, i){
+      if(!l.text && !l.handwriting) return;
+      slides.push({ label: (state.letters.length > 1 ? 'Letter ' + (i+1) : 'Letter'), render: function(container){
+        var seal = SEALS[l.sealIndex || 0] || SEALS[0];
+        var card = document.createElement('div');
+        card.className = 'viewer-letter-card';
+        card.innerHTML =
+          '<div class="viewer-letter-paper"></div>' +
+          '<div class="viewer-flap viewer-flap-top"></div>' +
+          '<div class="viewer-flap viewer-flap-bottom"></div>' +
+          '<div class="viewer-seal" style="background:'+seal.color+'">'+seal.sym+'</div>';
+        container.appendChild(card);
+        var paper = card.querySelector('.viewer-letter-paper');
+        if(l.handwriting){
+          var img = document.createElement('img');
+          img.src = l.handwriting; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'contain';
+          paper.appendChild(img);
+        } else {
+          paper.textContent = l.text || '';
+        }
+        var hint = document.createElement('div');
+        hint.className = 'viewer-tap-hint';
+        hint.textContent = 'tap the envelope to open it';
+        container.appendChild(hint);
+        card.addEventListener('click', function(){
+          var opening = !card.classList.contains('open');
+          card.classList.toggle('open');
+          hint.textContent = opening ? '' : 'tap the envelope to open it';
+        });
+      }});
     });
-    tracklist = state.tracklist || []; renderTracklist();
-    document.getElementById('linerNotes').value = state.linerNotes || '';
-    recipeGrid.innerHTML = '';
-    (state.recipes || []).forEach(function(r){ addRecipe(r); });
-    if((state.recipes || []).length === 0) addRecipe();
-    openWhenGrid.innerHTML = '';
-    (state.openWhens || []).forEach(function(o){ addOpenWhen(o); });
-    if((state.openWhens || []).length === 0){ addOpenWhen({label:'open when you miss me'}); addOpenWhen({label:'open when you need a laugh'}); }
-    if(state.bouquet && state.bouquet.vase){
-      bouquetLoaded = true;
-      bouquetBin.style.display = 'none';
-      arrangeZone.style.display = 'none';
-      tieBouquetBtn.style.display = 'none';
-      vaseBtn.style.display = 'none';
-      renderVaseScene(state.bouquet.stems || []);
+
+    if(state.bouquet && state.bouquet.vase && (state.bouquet.stems || []).length){
+      slides.push({ label: 'Bouquet', render: function(container){
+        var scene = document.createElement('div');
+        scene.className = 'vase-scene';
+        container.appendChild(scene);
+        renderVaseScene(state.bouquet.stems, scene);
+      }});
     }
-    albumGrid.innerHTML = '';
-    (state.photos || []).forEach(function(p){
-      var pol = document.createElement('div');
-      pol.className = 'polaroid';
-      pol.innerHTML = '<img src="'+p.img+'"><input type="text" value="'+(p.caption||'').replace(/"/g,'&quot;')+'">';
-      albumGrid.appendChild(pol);
-    });
-    canvas.innerHTML = '';
-    (state.stickers || []).forEach(function(s){
-      var el = document.createElement('div');
-      el.className = 'placed-sticker';
-      el.innerHTML = s.html;
-      el.style.left = s.left; el.style.top = s.top;
-      canvas.appendChild(el);
-      makeDraggable(el);
-    });
+
+    if((state.tracklist || []).length || (state.linerNotes || '').trim()){
+      slides.push({ label: 'Mixtape', render: function(container){
+        (state.tracklist || []).forEach(function(t, idx){
+          var row = document.createElement('div');
+          row.className = 'track-row';
+          if(t.type === 'youtube'){
+            row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span>' +
+              '<iframe width="220" height="130" src="https://www.youtube.com/embed/' + t.url + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
+          } else {
+            row.innerHTML = '<span class="title">' + (idx+1) + '. ' + escapeHtml(t.title) + '</span><audio controls src="' + t.url + '"></audio>';
+          }
+          container.appendChild(row);
+        });
+        if((state.linerNotes || '').trim()){
+          var notes = document.createElement('div');
+          notes.style.marginTop = '14px';
+          notes.style.fontFamily = "'Caveat', cursive";
+          notes.style.fontSize = '1.2rem';
+          notes.style.whiteSpace = 'pre-wrap';
+          notes.textContent = state.linerNotes;
+          container.appendChild(notes);
+        }
+      }});
+    }
+
+    if((state.photos || []).length){
+      slides.push({ label: 'Album', render: function(container){
+        var grid = document.createElement('div');
+        grid.className = 'viewer-album-grid';
+        state.photos.forEach(function(p){
+          var pol = document.createElement('div');
+          pol.className = 'viewer-polaroid';
+          pol.innerHTML = '<img src="'+p.img+'">' + (p.caption ? '<div class="viewer-caption">'+escapeHtml(p.caption)+'</div>' : '');
+          grid.appendChild(pol);
+        });
+        container.appendChild(grid);
+      }});
+    }
+
+    var recipes = (state.recipes || []).filter(function(r){ return r.title || r.ingredients || r.steps; });
+    if(recipes.length){
+      slides.push({ label: 'Recipes', render: function(container){
+        recipes.forEach(function(r){
+          var rc = document.createElement('div');
+          rc.className = 'viewer-recipe';
+          rc.innerHTML = '<h4>'+(escapeHtml(r.title) || 'Untitled dish')+'</h4>' +
+            (r.ingredients ? '<div style="white-space:pre-wrap;">'+escapeHtml(r.ingredients)+'</div>' : '') +
+            (r.steps ? '<div style="white-space:pre-wrap;margin-top:6px;">'+escapeHtml(r.steps)+'</div>' : '');
+          container.appendChild(rc);
+        });
+      }});
+    }
+
+    var opens = (state.openWhens || []).filter(function(o){ return o.label || o.note; });
+    if(opens.length){
+      slides.push({ label: 'Open When…', render: function(container){
+        opens.forEach(function(o){
+          var ow = document.createElement('div');
+          ow.className = 'viewer-openwhen';
+          ow.innerHTML = '<strong>💌 open when '+escapeHtml(o.label || '...')+'</strong><div class="viewer-ow-note"></div>';
+          ow.querySelector('.viewer-ow-note').textContent = o.note || '';
+          ow.addEventListener('click', function(){ ow.classList.toggle('open'); });
+          container.appendChild(ow);
+        });
+      }});
+    }
+
+    if((state.stickers || []).length){
+      slides.push({ label: 'Stickers', render: function(container){
+        var stickerCanvas = document.createElement('div');
+        stickerCanvas.className = 'viewer-sticker-canvas';
+        state.stickers.forEach(function(s){
+          var el = document.createElement('div');
+          el.className = 'placed-sticker';
+          el.innerHTML = s.html;
+          el.style.left = s.left; el.style.top = s.top;
+          stickerCanvas.appendChild(el);
+        });
+        container.appendChild(stickerCanvas);
+      }});
+    }
+
+    return slides;
   }
+
+  var viewerFinaleShown = false;
+
+  function showViewerSlide(i, dir){
+    if(viewerSlides.length === 0) return;
+    var newIndex = (i + viewerSlides.length) % viewerSlides.length;
+    if(dir === undefined) dir = newIndex >= viewerIndex ? 'next' : 'prev';
+    viewerIndex = newIndex;
+    Array.from(viewerSlideArea.children).forEach(function(el, idx){
+      var active = idx === viewerIndex;
+      el.classList.remove('enter-next', 'enter-prev');
+      el.classList.toggle('active', active);
+      if(active && dir !== 'init'){
+        void el.offsetWidth; // restart animation
+        el.classList.add(dir === 'prev' ? 'enter-prev' : 'enter-next');
+      }
+    });
+    Array.from(viewerDots.children).forEach(function(el, idx){ el.classList.toggle('active', idx === viewerIndex); });
+    if(viewerIndex === viewerSlides.length - 1 && !viewerFinaleShown){
+      viewerFinaleShown = true;
+      setTimeout(dropPetals, 250);
+    }
+  }
+
+  function renderBoxViewer(state){
+    viewerSlides = buildViewerSlides(state);
+    viewerSlideArea.innerHTML = '';
+    viewerDots.innerHTML = '';
+    viewerFinaleShown = false;
+    if(viewerSlides.length === 0){
+      viewerSlideArea.innerHTML = '<p class="note" style="text-align:center;">This box looks empty.</p>';
+    } else {
+      viewerSlides.forEach(function(slide, i){
+        var slideEl = document.createElement('div');
+        slideEl.className = 'viewer-slide';
+        slideEl.innerHTML = '<h3>' + slide.label + '</h3>';
+        slide.render(slideEl);
+        viewerSlideArea.appendChild(slideEl);
+        var dot = document.createElement('span');
+        dot.className = 'viewer-dot';
+        dot.addEventListener('click', function(){ showViewerSlide(i); });
+        viewerDots.appendChild(dot);
+      });
+      viewerIndex = 0;
+      showViewerSlide(0, 'init');
+      if(viewerSlides.length === 1) viewerFinaleShown = false; // let the single-slide case still get its splash below
+    }
+    boxScreen.style.display = 'none';
+    app.classList.remove('show');
+    viewerScreen.style.display = 'block';
+    viewerScreen.classList.remove('show');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ viewerScreen.classList.add('show'); });
+    });
+    if(viewerSlides.length === 1 && !viewerFinaleShown){
+      viewerFinaleShown = true;
+      setTimeout(dropPetals, 500);
+    }
+  }
+
+  viewerPrev.addEventListener('click', function(){ showViewerSlide(viewerIndex - 1, 'prev'); });
+  viewerNext.addEventListener('click', function(){ showViewerSlide(viewerIndex + 1, 'next'); });
+  document.getElementById('viewerNewBoxBtn').addEventListener('click', function(){
+    viewerScreen.classList.remove('show');
+    setTimeout(function(){ viewerScreen.style.display = 'none'; }, 400);
+    history.replaceState(null, '', location.pathname + location.search);
+    app.classList.add('show');
+  });
 
   document.getElementById('buildBoxBtn').addEventListener('click', function(){
     playSealStamp();
@@ -1761,15 +1996,16 @@
     document.getElementById('loadBoxFile').addEventListener('change', function(e){
       var file = e.target.files[0]; if(!file) return;
       var reader = new FileReader();
-      reader.onload = function(ev){ try{ applyBoxState(JSON.parse(ev.target.result)); tabButtons[0].click(); } catch(err){} };
+      reader.onload = function(ev){ try{ renderBoxViewer(JSON.parse(ev.target.result)); } catch(err){} };
       reader.readAsText(file);
     });
   }
 
-  // auto-load a shared box from the URL hash, e.g. #box=b12345
+  // auto-load a shared box from the URL hash, e.g. #box=b12345 — reveal it through the
+  // same ribbon/lid ceremony as any other box, instead of skipping straight to the carousel.
   (function(){
     var m = location.hash.match(/box=([a-zA-Z0-9]+)/);
-    if(m){ loadBoxById(m[1]); }
+    if(m){ loadBoxById(m[1], true); }
   })();
 
   refreshGallery();
