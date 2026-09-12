@@ -107,6 +107,12 @@
     background:rgba(255,253,247,0.55); transform:rotate(-14deg); z-index:7; padding:5px;
   }
 
+  /* ---------- STICKER PETS ---------- */
+  .pet-layer{ position:fixed; inset:0; pointer-events:none; z-index:998; overflow:hidden; }
+  .pet{ position:absolute; left:0; top:0; width:28px; height:28px; will-change:transform, opacity;
+        filter: drop-shadow(1px 2px 1px rgba(0,0,0,.3)); }
+  .pet svg{ width:100%; height:100%; display:block; }
+
   /* ---------- CONFETTI / PETALS ---------- */
   .petal-layer{ position:fixed; inset:0; pointer-events:none; z-index:999; overflow:hidden; }
   .petal{ position:absolute; top:-20px; border-radius:60% 0 60% 0; animation: petal-fall linear forwards; }
@@ -375,21 +381,30 @@
   /* the four folds of the packet. closed, each lies folded over the middle; opening
      rotates them flat about their crease, the way a letterlocked sheet opens out. */
   .fold-flap{
-    position:absolute; background:linear-gradient(160deg, #fbf6e9, #ece0c6);
+    position:absolute; opacity:1;
+    background:linear-gradient(160deg, #fbf6e9, #ece0c6);
     border:1px solid rgba(169,134,90,.5);
-    transition: transform .7s cubic-bezier(.5,0,.2,1);
   }
   .ff-top   { left:0; top:0;    width:100%; height:50%; transform-origin:50% 100%; transform:rotateX(-180deg); }
   .ff-bottom{ left:0; bottom:0; width:100%; height:50%; transform-origin:50% 0%;   transform:rotateX(180deg); }
   .ff-left  { left:0; top:0;    width:50%;  height:100%; transform-origin:100% 50%; transform:rotateY(180deg)  translateZ(1px); }
   .ff-right { right:0; top:0;   width:50%;  height:100%; transform-origin:0% 50%;   transform:rotateY(-180deg) translateZ(1px); }
-  /* unfolding reverses the order it was folded in: the last folds open first */
-  .viewer-letter-scene.unfolded .ff-left  { transform: rotateY(0deg)  translateZ(1px); }
-  .viewer-letter-scene.unfolded .ff-right { transform: rotateY(0deg)  translateZ(1px); }
+  /* folding back up: the inner folds close first, mirroring how it was folded */
+  .ff-top, .ff-bottom{ transition: transform .6s cubic-bezier(.5,0,.2,1) 0s,   opacity .2s ease 0s; }
+  .ff-left, .ff-right{ transition: transform .6s cubic-bezier(.5,0,.2,1) .3s,  opacity .2s ease 0s; }
+  /* opening reverses it: outer folds first. A flap lands flat exactly where the
+     sheet is, so it fades out as it settles — the crease flattens and the writing
+     underneath is what you're left looking at. */
+  .viewer-letter-scene.unfolded .ff-left,
+  .viewer-letter-scene.unfolded .ff-right{
+    transform: rotateY(0deg) translateZ(1px); opacity:0;
+    transition: transform .6s cubic-bezier(.5,0,.2,1) 0s, opacity .22s ease .46s;
+  }
   .viewer-letter-scene.unfolded .ff-top,
-  .viewer-letter-scene.unfolded .ff-bottom{ transform: rotateX(0deg); transition-delay:.34s; }
-  .viewer-letter-scene .ff-left, .viewer-letter-scene .ff-right{ transition-delay:.34s; }
-  .viewer-letter-scene.unfolded .ff-left, .viewer-letter-scene.unfolded .ff-right{ transition-delay:0s; }
+  .viewer-letter-scene.unfolded .ff-bottom{
+    transform: rotateX(0deg); opacity:0;
+    transition: transform .6s cubic-bezier(.5,0,.2,1) .3s, opacity .22s ease .76s;
+  }
   /* creases, and the deeper shade of the paper's reverse */
   .fold-flap::after{
     content:''; position:absolute; inset:0; pointer-events:none;
@@ -1339,6 +1354,9 @@
       var r = canvas.getBoundingClientRect();
       return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
     }
+    // a press that doesn't travel is a click on the bloom (opens where it came from);
+    // a press that drags is you pulling the stem about
+    var pressAt = null, pressTime = 0;
     canvas.addEventListener('pointerdown', function(e){
       var p = localPos(e);
       pointer = p;
@@ -1350,9 +1368,11 @@
       });
       if(best){
         grabbed = best;
+        pressAt = p; pressTime = performance.now();
         canvas.style.cursor = 'grabbing';
         try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
       } else {
+        pressAt = null;
         spawnPetals(p.x, p.y, 3);
       }
       e.preventDefault();
@@ -1363,27 +1383,52 @@
     });
     function release(){
       if(!grabbed) return;
-      var tip = grabbed.pts[SEG];
-      spawnPetals(tip[0], tip[1], 2);
-      grabbed = null;
+      var rp = grabbed, tip = rp.pts[SEG];
+      var travelled = pressAt ? Math.hypot(pointer.x - pressAt.x, pointer.y - pressAt.y) : 99;
+      var quick = performance.now() - pressTime < 400;
+      grabbed = null; pressAt = null;
       canvas.style.cursor = 'grab';
+      if(travelled < 6 && quick && rp.data.link){
+        window.open(rp.data.link, '_blank', 'noopener');
+      } else {
+        spawnPetals(tip[0], tip[1], 2);
+      }
     }
     canvas.addEventListener('pointerup', release);
     canvas.addEventListener('pointercancel', release);
+    canvas.addEventListener('pointermove', function(e){
+      if(grabbed) return;
+      var p = localPos(e), over = false;
+      ropes.forEach(function(rp){
+        var tip = rp.pts[SEG];
+        if(Math.hypot(tip[0] - p.x, tip[1] - p.y) < rp.headR + 6) over = true;
+      });
+      canvas.style.cursor = over ? 'pointer' : 'grab';
+    });
 
     // ---- simulation
-    var K_REST = 26, DAMP = 0.90, ITER = 5;
+    var K_REST = 26, DAMP = 0.915, ITER = 5;
+    var bubbles = [], bubbleClock = 0.6, clockNow = 0;
     function step(dt, t){
+      clockNow = t;
+      // one wind field over the whole bouquet, like a tree in a breeze: a slow
+      // baseline with gusts that swell and pass, so the stems lean together rather
+      // than each wobbling on its own clock
+      var gustEnv = Math.max(0, Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.09 + 1.3) * 0.5 + 0.25);
+      var wind = (Math.sin(t * 0.55) * 0.7 + Math.sin(t * 1.27 + 0.8) * 0.3) * (0.45 + gustEnv * 1.25);
+
       ropes.forEach(function(rp){
-        var breeze = (Math.sin(t * 0.7 + rp.phase) * 0.6 + Math.sin(t * 1.9 + rp.phase * 1.7) * 0.4) * rp.gust;
+        // each stem answers the same wind slightly late and at its own stiffness
+        var local = wind * rp.gust + Math.sin(t * 2.3 + rp.phase) * 0.16 * gustEnv;
         var i, j, it;
         for(i = 1; i <= SEG; i++){
           var p = rp.pts[i], pv = rp.prev[i], rs = rp.rest[i];
           var vx = (p[0] - pv[0]) * DAMP, vy = (p[1] - pv[1]) * DAMP;
           pv[0] = p[0]; pv[1] = p[1];
-          var tipness = i / SEG;
-          var ax = (rs[0] - p[0]) * K_REST + breeze * 26 * tipness;
-          var ay = (rs[1] - p[1]) * K_REST + 14;
+          // a trunk barely moves and the tip whips: leverage grows up the stem
+          var tipness = i / SEG, lever = tipness * tipness;
+          var ax = (rs[0] - p[0]) * K_REST + local * 58 * lever;
+          var ay = (rs[1] - p[1]) * K_REST + 14 - local * 10 * lever;
           p[0] += vx + ax * dt * dt;
           p[1] += vy + ay * dt * dt;
         }
@@ -1412,6 +1457,26 @@
         pt.rot += pt.vr * dt;
         pt.life -= dt * 0.55;
         if(pt.life <= 0 || pt.y > H + 20) petals.splice(pi, 1);
+      }
+
+      // bubbles cling to the stems and the glass, then let go and wobble up to
+      // the surface — they pop the moment they break the waterline
+      bubbleClock -= dt;
+      if(bubbleClock <= 0 && bubbles.length < 18){
+        bubbleClock = 0.35 + Math.random() * 0.9;
+        bubbles.push({
+          x: vaseX + (Math.random() - 0.5) * 62,
+          y: vaseTopY + 118 - Math.random() * 14,
+          r: 1.1 + Math.random() * 2.6,
+          phase: Math.random() * Math.PI * 2,
+          rise: 9 + Math.random() * 16
+        });
+      }
+      for(var bi = bubbles.length - 1; bi >= 0; bi--){
+        var bb = bubbles[bi];
+        bb.y -= bb.rise * dt;                  // bigger bubbles climb faster
+        bb.x += Math.sin(clockNow * 2.4 + bb.phase) * 5 * dt;
+        if(bb.y < waterY + bb.r) bubbles.splice(bi, 1);
       }
     }
 
@@ -1494,6 +1559,14 @@
       ctx.fillRect(vaseX - 60, waterY, 120, 200);
       ctx.fillStyle = 'rgba(255,255,255,.45)';
       ctx.fillRect(vaseX - 60, waterY - 1.5, 120, 2);
+      bubbles.forEach(function(bb){
+        ctx.beginPath(); ctx.arc(bb.x, bb.y, bb.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(236,248,247,.30)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.7; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(bb.x - bb.r * 0.32, bb.y - bb.r * 0.34, Math.max(0.4, bb.r * 0.3), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill();
+      });
       ctx.restore();
       var g = ctx.createLinearGradient(vaseX - 52, 0, vaseX + 52, 0);
       g.addColorStop(0, 'rgba(215,225,225,.42)');
@@ -3529,6 +3602,92 @@
       reader.readAsText(file);
     });
   }
+
+  /* ---------------- STICKER PETS ----------------
+     Little pixel creatures that pop out of the cursor's wake and trot after it.
+     Each one chases a point trailing a fixed distance behind the pointer, with a
+     spring and its own lag, so they string out in a line and overshoot on corners
+     the way something small and eager would. They hop while moving, settle and
+     blink when the cursor stops, and wander off after a few seconds.          */
+  (function(){
+    if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+
+    var layer = document.createElement('div');
+    layer.className = 'pet-layer';
+    document.body.appendChild(layer);
+
+    var pets = [], trail = [], px2 = 0, py2 = 0, travelled = 0, raf = null, lastMove = 0;
+    var KEYS = null;
+    var SPAWN_EVERY = 260, MAX_PETS = 4, LIFETIME = 5200;
+
+    function spawn(x, y){
+      if(!KEYS) KEYS = Object.keys(STICKERS);
+      if(!KEYS.length) return;
+      var key = KEYS[Math.floor(Math.random() * KEYS.length)];
+      var s = STICKERS[key];
+      var el = document.createElement('div');
+      el.className = 'pet';
+      el.innerHTML = px(s.grid, s.colors, 5);
+      layer.appendChild(el);
+      pets.push({
+        el: el, x: x, y: y, vx: 0, vy: 0,
+        lag: 34 + Math.random() * 46,        // how far back it likes to sit
+        stiff: 5 + Math.random() * 4,
+        born: performance.now(),
+        bob: Math.random() * Math.PI * 2,
+        face: 1
+      });
+    }
+
+    function tick(now){
+      var alive = [];
+      for(var i = 0; i < pets.length; i++){
+        var p = pets[i];
+        var age = now - p.born;
+        if(age > LIFETIME){ p.el.remove(); continue; }
+        alive.push(p);
+
+        // aim at a point that trails the cursor by this pet's preferred distance
+        var idx = Math.min(trail.length - 1, Math.round(p.lag / 10));
+        var t = trail[idx] || trail[trail.length - 1] || { x: px2, y: py2 };
+        var dx = t.x - p.x, dy = t.y - p.y;
+        var d = Math.hypot(dx, dy);
+        if(d > 2){
+          p.vx += dx * p.stiff * 0.016;
+          p.vy += dy * p.stiff * 0.016;
+        }
+        p.vx *= 0.82; p.vy *= 0.82;
+        p.x += p.vx * 0.12; p.y += p.vy * 0.12;
+
+        var speed = Math.hypot(p.vx, p.vy);
+        if(speed > 8) p.face = p.vx < 0 ? -1 : 1;
+        p.bob += 0.25 + Math.min(0.5, speed * 0.012);
+        var hop = speed > 5 ? Math.abs(Math.sin(p.bob)) * Math.min(7, speed * 0.22) : 0;
+
+        // fade in on arrival, fade out as it loses interest
+        var fade = Math.min(1, age / 260) * Math.min(1, (LIFETIME - age) / 900);
+        p.el.style.opacity = fade;
+        p.el.style.transform =
+          'translate3d(' + (p.x - 14) + 'px,' + (p.y - 14 - hop) + 'px,0) scaleX(' + p.face + ')';
+      }
+      pets = alive;
+      if(pets.length){ raf = requestAnimationFrame(tick); } else { raf = null; }
+    }
+
+    window.addEventListener('pointermove', function(e){
+      if(e.pointerType === 'touch') return;
+      var nx = e.clientX, ny = e.clientY;
+      travelled += Math.hypot(nx - px2, ny - py2);
+      px2 = nx; py2 = ny; lastMove = performance.now();
+      trail.unshift({ x: nx, y: ny });
+      if(trail.length > 26) trail.pop();
+      if(travelled > SPAWN_EVERY && pets.length < MAX_PETS){
+        travelled = 0;
+        spawn(nx + (Math.random() - 0.5) * 30, ny + (Math.random() - 0.5) * 30);
+      }
+      if(raf === null && pets.length) raf = requestAnimationFrame(tick);
+    }, { passive: true });
+  })();
 
   // auto-load a shared box from the URL hash, e.g. #box=b12345 — reveal it through the
   // same ribbon/lid ceremony as any other box, instead of skipping straight to the carousel.
