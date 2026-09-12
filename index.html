@@ -218,14 +218,16 @@
     border:2px dashed var(--kraft-dark); border-radius:16px; margin-bottom:14px; overflow:visible;
   }
   .arrange-hint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#a2937a; font-style:italic; pointer-events:none; text-align:center; padding:20px; }
-  .arranged-stem{ position:absolute; width:74px; text-align:center; cursor:grab; touch-action:none; }
+  .arranged-stem{ position:absolute; width:74px; text-align:center; cursor:grab; touch-action:none; z-index:2; }
   .arrange-zone.tied .arranged-stem{ cursor:default; }
   .arranged-stem img{ width:64px; height:64px; border-radius:50%; object-fit:cover; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,.25); pointer-events:none; }
   .arranged-stem .leaf-row{ pointer-events:auto; }
-  .tie-band{ position:absolute; height:20px; background:var(--gold); border-radius:5px; box-shadow:0 2px 5px rgba(0,0,0,.3); z-index:6; }
+  .stems-svg{ position:absolute; left:0; top:0; z-index:1; pointer-events:none; }
+  .tie-knot{ position:absolute; width:34px; height:17px; background:var(--gold); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.35); z-index:3; }
 
-  .vase-scene{ position:relative; height:340px; margin:10px auto 6px; }
-  .vase-stem{ position:absolute; width:66px; text-align:center; transform-origin:bottom center; }
+  .vase-scene{ position:relative; width:320px; height:340px; margin:10px auto 6px; }
+  .vase-svg{ position:absolute; z-index:2; }
+  .vase-stem{ position:absolute; width:66px; text-align:center; transform-origin:bottom center; z-index:3; }
   .vase-stem img{ width:58px; height:58px; border-radius:50%; object-fit:cover; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,.25); }
   .vase-stem.droop{ animation: droop 3s ease-in forwards; }
   @keyframes droop{ from{ transform: rotate(0deg); } to{ transform: rotate(var(--droop-angle, 8deg)); } }
@@ -878,40 +880,109 @@
     tieBouquetBtn.disabled = arrangedStems.length < 2;
   }
 
+  function squigglyPath(x1, y1, x2, y2, wiggle){
+    var midX1 = x1 + (x2 - x1) * 0.33 + wiggle, midY1 = y1 + (y2 - y1) * 0.33;
+    var midX2 = x1 + (x2 - x1) * 0.66 - wiggle, midY2 = y1 + (y2 - y1) * 0.66;
+    return 'M' + x1 + ',' + y1 + ' C ' + midX1 + ',' + midY1 + ' ' + midX2 + ',' + midY2 + ' ' + x2 + ',' + y2;
+  }
+
   tieBouquetBtn.addEventListener('click', function(){
     bouquetTied = true;
     arrangeZone.classList.add('tied');
-    var minX=1e9,maxX=-1e9,maxY=-1e9;
+
+    var cx = 0, maxY = -1e9;
     arrangedStems.forEach(function(s){
-      var l = parseFloat(s.el.style.left), t = parseFloat(s.el.style.top);
-      minX = Math.min(minX, l); maxX = Math.max(maxX, l + s.el.offsetWidth); maxY = Math.max(maxY, t + s.el.offsetHeight);
+      cx += parseFloat(s.el.style.left) + s.el.offsetWidth / 2;
+      maxY = Math.max(maxY, parseFloat(s.el.style.top) + s.el.offsetHeight);
     });
-    var band = document.createElement('div');
-    band.className = 'tie-band';
-    band.style.left = minX + 'px';
-    band.style.width = Math.max(maxX - minX, 40) + 'px';
-    band.style.top = (maxY - 26) + 'px';
-    arrangeZone.appendChild(band);
+    cx /= arrangedStems.length;
+    var tieX = cx, tieY = maxY + 22;
+
+    arrangedStems.forEach(function(s){
+      var curL = parseFloat(s.el.style.left), curT = parseFloat(s.el.style.top);
+      var headCx = curL + s.el.offsetWidth / 2;
+      var targetL = curL + (cx - headCx) * 0.55;
+      s.el.style.transition = 'left .6s ease';
+      s.el.style.left = targetL + 'px';
+      s.el.dataset.top = curT;
+    });
+
+    setTimeout(function(){
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'stems-svg');
+      svg.setAttribute('width', arrangeZone.clientWidth);
+      svg.setAttribute('height', arrangeZone.clientHeight);
+      arrangedStems.forEach(function(s, i){
+        var headX = parseFloat(s.el.style.left) + s.el.offsetWidth / 2;
+        var headY = parseFloat(s.el.dataset.top) + s.el.offsetHeight - 6;
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', squigglyPath(headX, headY, tieX, tieY, i % 2 === 0 ? 14 : -14));
+        path.setAttribute('stroke', '#6B8F71');
+        path.setAttribute('stroke-width', '3.4');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(path);
+      });
+      arrangeZone.insertBefore(svg, arrangeZone.firstChild);
+
+      var knot = document.createElement('div');
+      knot.className = 'tie-knot';
+      knot.style.left = (tieX - 17) + 'px';
+      knot.style.top = (tieY - 8) + 'px';
+      arrangeZone.appendChild(knot);
+    }, 620);
+
     tieBouquetBtn.disabled = true;
     vaseBtn.disabled = false;
   });
 
   function renderVaseScene(stems){
-    vaseScene.innerHTML =
-      '<svg class="vase-svg" width="140" height="140" viewBox="0 0 140 140"><path d="M50 20 L90 20 L100 60 C110 90 100 120 70 120 C40 120 30 90 40 60 Z" fill="#7A2E2E"/></svg>';
+    var W = 320, H = 340, vaseW = 140, vaseH = 140;
+    var vaseX = W / 2, vaseTopY = H - vaseH;
+    var tieX = vaseX, tieY = vaseTopY + 34;
     var n = stems.length;
-    stems.forEach(function(s, i){
-      var angle = n > 1 ? (i/(n-1) - 0.5) * 50 : 0;
-      var offsetX = 70 + angle * 1.6;
+
+    var heads = stems.map(function(s, i){
+      var angle = n > 1 ? (i / (n - 1) - 0.5) * 50 : 0;
+      return {
+        x: vaseX + Math.sin(angle * Math.PI / 180) * 78,
+        y: 62 + Math.abs(angle) * 0.6 + (i % 2 === 0 ? 0 : 10),
+        angle: angle
+      };
+    });
+
+    var stemsSvg = '<svg class="stems-svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+    heads.forEach(function(p, i){
+      var headBottomY = p.y + 26;
+      stemsSvg += '<path d="' + squigglyPath(p.x, headBottomY, tieX, tieY, i % 2 === 0 ? 14 : -14) +
+        '" stroke="#6B8F71" stroke-width="3.4" fill="none" stroke-linecap="round"/>';
+    });
+    stemsSvg += '</svg>';
+
+    var vaseSvg = '<svg class="vase-svg" width="' + vaseW + '" height="' + vaseH + '" viewBox="0 0 140 140" ' +
+      'style="left:' + (vaseX - vaseW / 2) + 'px; top:' + vaseTopY + 'px;">' +
+      '<path d="M50 20 L90 20 L100 60 C110 90 100 120 70 120 C40 120 30 90 40 60 Z" fill="#7A2E2E"/></svg>';
+
+    vaseScene.innerHTML = stemsSvg + vaseSvg;
+
+    var knot = document.createElement('div');
+    knot.className = 'tie-knot';
+    knot.style.left = (tieX - 17) + 'px';
+    knot.style.top = (vaseTopY - 15) + 'px';
+    vaseScene.appendChild(knot);
+
+    heads.forEach(function(p, i){
+      var s = stems[i];
       var el = document.createElement('div');
       el.className = 'vase-stem droop';
-      el.style.left = (offsetX - 33) + 'px';
-      el.style.bottom = '96px';
-      el.style.setProperty('--droop-angle', angle.toFixed(1) + 'deg');
+      el.style.left = (p.x - 29) + 'px';
+      el.style.top = (p.y - 29) + 'px';
+      el.style.setProperty('--droop-angle', (p.angle * 0.4).toFixed(1) + 'deg');
       el.style.animationDelay = (i * 0.15) + 's';
       el.innerHTML = '<img src="'+s.img+'" alt="'+s.title+'">' + leafRowHTML(s.leaves || [true,true]);
       vaseScene.appendChild(el);
     });
+
     var caption = document.createElement('div');
     caption.className = 'vase-caption';
     caption.textContent = 'picked, tied, and resting in the vase — click it 🌿';
